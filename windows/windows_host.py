@@ -91,12 +91,17 @@ class Editor:
         if not self.loaded:self.pending_imports.extend(paths);return
         entries=self.app.read_imports(paths);self.fire('window.vistaNotesOpenDroppedFiles('+json.dumps(entries,ensure_ascii=True)+');')
     def show_window(self):
+        point=None
         if self.anchor:self.app.platform.position(self,self.anchor)
         elif self.launch_point is not None:
             point=self.launch_point;self.launch_point=None
             try:self.app.platform.position_near_pointer(self,point)
             except Exception as error:self.app.log('Window placement: '+str(error))
         self.window.show()
+        if point is not None:
+            try:report=self.app.platform.confirm_launch_position(self,point)
+            except Exception as error:report={'point':point,'ok':False,'error':str(error)}
+            self.app.record_window_placement(self,report)
     def dispatch(self,data):
         command=data.get('command');app=self.app
         if command=='load':
@@ -259,14 +264,25 @@ class Application:
             self.folder.mkdir(parents=True,exist_ok=True)
             with (self.folder/'diagnostics.log').open('a',encoding='utf-8') as output:output.write(str(text)+'\n')
         except OSError:pass
+    def record_window_placement(self,editor,report):
+        try:
+            self.folder.mkdir(parents=True,exist_ok=True)
+            data=dict(report,build=self.build,windowId=editor.identity)
+            self.store.atomic_write(self.folder/('window-placement-'+self.build+'.json'),(json.dumps(data,indent=2)+'\n').encode('utf-8'))
+        except (OSError,TypeError,ValueError) as error:self.log('Window placement report: '+str(error))
     def new_window(self,ids=None,transfer=None,anchor=None,launch_point=None):
         if anchor is None and launch_point is None:
             try:launch_point=self.platform.launch_point()
             except OSError as error:self.log('Launch position: '+str(error))
+        bounds={'width':1120,'height':790}
+        point=anchor.get('point') if anchor else launch_point
+        if point is not None:
+            try:bounds.update(self.platform.initial_window_bounds(point,1120,790))
+            except Exception as error:self.log('Initial window position: '+str(error))
         with self.lock:
             identity='main' if self.window_sequence==0 else 'window-'+uuid.uuid4().hex;self.window_sequence+=1;editor=Editor(self,identity,ids,transfer,anchor,launch_point);self.editors[identity]=editor
         try:
-            editor.window=self.webview.create_window('Another Note',url=self.uri,js_api=Bridge(editor),width=1120,height=790,min_size=(480,340),hidden=True,background_color='#191e23',text_select=True)
+            editor.window=self.webview.create_window('Another Note',url=self.uri,js_api=Bridge(editor),**bounds,min_size=(min(480,bounds['width']),min(340,bounds['height'])),hidden=True,background_color='#191e23',text_select=True)
             editor.window.events.closing+=editor.request_close;editor.window.events.closed+=editor.on_closed;editor.window.events.loaded+=editor.on_loaded
             def stalled():
                 if not editor.ready.is_set() and not editor.closed:

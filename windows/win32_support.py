@@ -2,6 +2,7 @@
 import ctypes as C
 from ctypes import wintypes as W
 import os
+from contextlib import contextmanager
 
 class MonitorInfo(C.Structure):
     _fields_=[('size',W.DWORD),('monitor',W.RECT),('work',W.RECT),('flags',W.DWORD)]
@@ -23,8 +24,10 @@ class WindowsPlatform:
         bind(self.user,'GetCursorPos',[C.POINTER(W.POINT)],W.BOOL)
         bind(self.user,'GetPhysicalCursorPos',[C.POINTER(W.POINT)],W.BOOL)
         bind(self.user,'MonitorFromPoint',[W.POINT,W.DWORD],ptr)
+        bind(self.user,'MonitorFromWindow',[ptr,W.DWORD],ptr)
         bind(self.user,'GetMonitorInfoW',[ptr,C.POINTER(MonitorInfo)],W.BOOL)
         bind(self.user,'SetThreadDpiAwarenessContext',[ptr],ptr)
+        bind(self.user,'GetDpiForSystem',[],W.UINT)
         bind(self.user,'GetAsyncKeyState',[C.c_int],C.c_short)
         bind(self.user,'WindowFromPoint',[W.POINT],ptr)
         bind(self.user,'GetAncestor',[ptr,W.UINT],ptr)
@@ -70,20 +73,39 @@ class WindowsPlatform:
         p=W.POINT()
         if not self.user.GetPhysicalCursorPos(C.byref(p)):raise OSError('Could not read the launch mouse position.')
         return p.x,p.y
+    @contextmanager
+    def dpi_context(self,mode=-4):
+        previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(mode))
+        if not previous and mode==-4:previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(-3))
+        if not previous:raise OSError('Could not select the window coordinate space.')
+        try:yield
+        finally:self.user.SetThreadDpiAwarenessContext(previous)
+    def monitor_area(self,point):
+        monitor=self.user.MonitorFromPoint(W.POINT(*point),2)
+        info=MonitorInfo();info.size=C.sizeof(info)
+        if not monitor or not self.user.GetMonitorInfoW(monitor,C.byref(info)):raise OSError('Could not read the launch monitor.')
+        work=info.work
+        return monitor,(work.left,work.top,work.right,work.bottom)
+    def initial_window_bounds(self,point,width,height):
+        # WinForms multiplies pywebview's initial coordinates by the system
+        # scale. Supply those coordinates before its first hidden Show, so it
+        # never starts by centering the window on the default monitor.
+        with self.dpi_context(-2):
+            dpi=self.user.GetDpiForSystem()
+            if not dpi:raise OSError('Could not read the system display scale.')
+        scale=dpi/96
+        with self.dpi_context():
+            _,area=self.monitor_area(point)
+            x,y,w,h=near_pointer_bounds(point,area,(round(width*scale),round(height*scale)))
+        return dict(x=round(x/scale),y=round(y/scale),width=max(1,round(w/scale)),height=max(1,round(h/scale)))
     def position_near_pointer(self,editor,point):
         def place():
             from System.Windows.Forms import FormStartPosition
             editor.window.native.StartPosition=FormStartPosition.Manual
             # Use physical pixels consistently even across differently scaled
             # monitors, then restore the GUI thread's original DPI context.
-            previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(-4))
-            if not previous:previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(-3))
-            if not previous:raise OSError('Could not select physical window coordinates.')
-            try:
-                monitor=self.user.MonitorFromPoint(W.POINT(*point),2)
-                info=MonitorInfo();info.size=C.sizeof(info)
-                if not monitor or not self.user.GetMonitorInfoW(monitor,C.byref(info)):raise OSError('Could not read the launch monitor.')
-                work=info.work;area=(work.left,work.top,work.right,work.bottom);handle=self.handle(editor)
+            with self.dpi_context():
+                _,area=self.monitor_area(point);handle=self.handle(editor)
                 # Moving to a different DPI can change the physical window
                 # size. Read it again there before the final on-screen clamp.
                 for _ in range(2):
@@ -91,9 +113,29 @@ class WindowsPlatform:
                     if not self.user.GetWindowRect(handle,C.byref(rect)):raise OSError('Could not read the new window bounds.')
                     bounds=near_pointer_bounds(point,area,(rect.right-rect.left,rect.bottom-rect.top))
                     if not self.user.SetWindowPos(handle,None,*bounds,0x14):raise OSError('Could not position the new window.')
-            finally:
-                self.user.SetThreadDpiAwarenessContext(previous)
         editor.ui(place)
+    def confirm_launch_position(self,editor,point):
+        report={'point':point,'ok':False,'corrections':0}
+        def confirm():
+            with self.dpi_context():
+                monitor,area=self.monitor_area(point);handle=self.handle(editor)
+                report.update(requestedMonitor=int(monitor),workArea=area)
+                for attempt in range(4):
+                    rect=W.RECT()
+                    if not self.user.GetWindowRect(handle,C.byref(rect)):raise OSError('Could not verify the shown window.')
+                    actual=(rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top)
+                    expected=near_pointer_bounds(point,area,actual[2:])
+                    actual_monitor=int(self.user.MonitorFromWindow(handle,2) or 0)
+                    report.update(actualMonitor=actual_monitor,actualBounds=actual,expectedBounds=expected)
+                    if actual_monitor==int(monitor) and all(abs(a-b)<=2 for a,b in zip(actual,expected)):
+                        report['ok']=True;return
+                    if attempt<3:
+                        if not self.user.SetWindowPos(handle,None,*expected,0x14):raise OSError('Could not correct the shown window position.')
+                        report['corrections']+=1
+                report['error']='The shown window did not stay on its requested monitor.'
+        try:editor.ui(confirm)
+        except Exception as error:report['error']=str(error)
+        return report
     def pressed(self,key):return bool(self.user.GetAsyncKeyState(key)&0x8000)
     def root_at(self,point):return int(self.user.GetAncestor(self.user.WindowFromPoint(W.POINT(*point)),2) or 0)
     def frame(self,editor):

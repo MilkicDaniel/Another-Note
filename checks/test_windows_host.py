@@ -32,6 +32,8 @@ class Platform:
     def cursor(self):return self.point
     def launch_point(self):return self.point
     def position_near_pointer(self,editor,point):self.launch_positions.append(point)
+    def initial_window_bounds(self,point,width,height):return dict(x=point[0]+16,y=point[1]+16,width=width,height=height)
+    def confirm_launch_position(self,editor,point):return {'point':point,'ok':True,'corrections':0}
     def pressed(self,key):return self.keys.get(key,False)
     def frame(self,editor):return (0,0,1120,790,0,0)
     def create_ghost(self,*args):self.ghost=True
@@ -76,11 +78,21 @@ class WindowsHostTests(unittest.TestCase):
     def test_launch_position_is_captured_before_loading_and_applied_before_show(self):
         self.platform.point=(4400,-300);fresh=self.app.new_window(ids=[])
         self.platform.point=(100,100);fresh.dispatch({'command':'load'});events=[]
-        with patch.object(self.platform,'position_near_pointer',side_effect=lambda editor,point:events.append(('place',point))),patch.object(fresh.window,'show',side_effect=lambda:events.append(('show',))):
+        with patch.object(self.platform,'position_near_pointer',side_effect=lambda editor,point:events.append(('place',point))),patch.object(fresh.window,'show',side_effect=lambda:events.append(('show',))),patch.object(self.platform,'confirm_launch_position',side_effect=lambda editor,point:events.append(('confirm',point)) or {'ok':True}):
             fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
             fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
-        self.assertEqual(events,[('place',(4400,-300)),('show',),('show',)])
+        self.assertEqual(events,[('place',(4400,-300)),('show',),('confirm',(4400,-300)),('show',)])
         self.assertIsNone(fresh.launch_point)
+    def test_window_gets_its_mouse_monitor_position_at_creation(self):
+        with patch.object(self.app.webview,'create_window',wraps=self.app.webview.create_window) as create:
+            fresh=self.app.new_window(ids=[],launch_point=(-2200,500))
+        self.assertEqual(create.call_args.kwargs['x'],-2184);self.assertEqual(create.call_args.kwargs['y'],516)
+        self.assertTrue(create.call_args.kwargs['hidden']);self.assertFalse(fresh.window.visible)
+    def test_shown_window_placement_is_saved_as_a_small_local_report(self):
+        fresh=self.app.new_window(ids=[],launch_point=(-2200,500));fresh.dispatch({'command':'load'})
+        fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+        report=json.loads((self.app.folder/('window-placement-'+self.app.build+'.json')).read_text())
+        self.assertEqual(report['point'],[-2200,500]);self.assertTrue(report['ok']);self.assertEqual(report['build'],self.app.build)
     def test_forwarded_launch_position_is_used_instead_of_the_receivers_pointer(self):
         fresh=self.app.new_window(ids=[],launch_point=(-2200,500));fresh.dispatch({'command':'load'})
         fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})

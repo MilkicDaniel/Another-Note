@@ -30,6 +30,8 @@ class NativePlacementTests(unittest.TestCase):
     def platform(self,frames=None,area=(3840,0,7680,2120)):
         platform=WindowsPlatform.__new__(WindowsPlatform);platform.user=Mock();platform.handle=lambda editor:123
         platform.user.SetThreadDpiAwarenessContext.return_value=457
+        platform.user.GetDpiForSystem.return_value=144
+        platform.user.MonitorFromWindow.return_value=9
         platform.user.MonitorFromPoint.return_value=9;platform.user.SetWindowPos.return_value=1
         def monitor_info(monitor,pointer):
             self.assertEqual(monitor,9);info=pointer._obj;self.assertEqual(info.size,C.sizeof(MonitorInfo))
@@ -49,6 +51,26 @@ class NativePlacementTests(unittest.TestCase):
         def physical(pointer):pointer._obj.x=-2200;pointer._obj.y=500;return 1
         platform.user.GetPhysicalCursorPos.side_effect=physical
         self.assertEqual(platform.launch_point(),(-2200,500));platform.user.GetCursorPos.assert_not_called()
+    def test_initial_coordinates_account_for_winforms_system_scaling(self):
+        platform,_=self.platform()
+        self.assertEqual(platform.initial_window_bounds((4400,300),1120,790),{'x':2944,'y':211,'width':1120,'height':790})
+        self.assertEqual(platform.user.SetThreadDpiAwarenessContext.call_args.args,(457,))
+    def test_show_time_reset_to_primary_is_corrected(self):
+        platform,editor=self.platform(frames=[(0,0,1120,790),(4416,316,5536,1106)])
+        platform.user.MonitorFromWindow.side_effect=[1,9]
+        report=platform.confirm_launch_position(editor,(4400,300))
+        self.assertTrue(report['ok']);self.assertEqual(report['corrections'],1)
+        self.assertEqual(platform.user.SetWindowPos.call_args.args,(123,None,4416,316,1120,790,0x14))
+    def test_already_correct_shown_window_is_not_moved(self):
+        platform,editor=self.platform(frames=[(4416,316,5536,1106)])
+        report=platform.confirm_launch_position(editor,(4400,300))
+        self.assertTrue(report['ok']);self.assertEqual(report['corrections'],0);platform.user.SetWindowPos.assert_not_called()
+    def test_native_placement_failure_has_the_requested_and_actual_monitor(self):
+        platform,editor=self.platform(frames=[(0,0,1120,790)]*4)
+        platform.user.MonitorFromWindow.return_value=1
+        report=platform.confirm_launch_position(editor,(4400,300))
+        self.assertFalse(report['ok']);self.assertEqual(report['requestedMonitor'],9);self.assertEqual(report['actualMonitor'],1)
+        self.assertEqual(report['corrections'],3);self.assertIn('error',report)
     def test_native_placement_selects_the_pointer_monitor_without_showing_the_window(self):
         platform,editor=self.platform();platform.position_near_pointer(editor,(4400,300))
         point,flags=platform.user.MonitorFromPoint.call_args.args

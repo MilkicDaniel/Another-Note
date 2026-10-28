@@ -4,9 +4,9 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open `Another-Note-2026.10.28-r2.html` in your browser.
-- **Windows:** run `Another-Note-Setup-2026.10.28-r2.exe`, or extract `Another-Note-Windows-2026.10.28-r2.zip` and run `Another-Note.exe` inside it.
-- **Fedora:** extract `Another-Note-Fedora-2026.10.28-r2.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **HTML:** open `Another-Note-2026.10.28-r3.html` in your browser.
+- **Windows:** run `Another-Note-Setup-2026.10.28-r3.exe`, or extract `Another-Note-Windows-2026.10.28-r3.zip` and run `Another-Note.exe` inside it.
+- **Fedora:** extract `Another-Note-Fedora-2026.10.28-r3.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
@@ -135,3 +135,9 @@ The Windows installer and portable package are also supplied for this build, inc
 ## Build 2026.10.28-r2
 
 New Windows application windows open near the mouse on the monitor where you launched them. The launch position is captured before startup and passed to the running instance on repeat launches. Placement uses physical coordinates and the selected monitor’s usable work area, including monitors left of or above the primary display and displays with different scaling. Windows are positioned before they appear; detached tabs keep their explicit drop placement. Existing windows are not repositioned by file-open requests.
+
+## Build 2026.10.28-r3
+
+Windows supplies explicit initial coordinates before the toolkit first shows a native window. It then verifies the actual monitor and bounds after the window appears, correcting placement if startup changed it. Initial coordinates account for the system display scale; final placement uses physical monitor coordinates. Detached tabs retain their drop position.
+
+A small last-launch report is kept locally at `%LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r3.json`. It contains window and monitor geometry and errors, with no note contents. Release checks now include real WinForms and packaged-app launches on a Windows runner. Physical multi-monitor hardware is unavailable in CI.

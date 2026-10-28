@@ -1,10 +1,10 @@
 Another Note for Windows (64-bit)
 
 INSTALL
-Run Another-Note-Setup-2026.10.28-r2.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
+Run Another-Note-Setup-2026.10.28-r3.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
 
 PORTABLE PACKAGE
-Extract the entire Another-Note-Windows-2026.10.28-r2.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
+Extract the entire Another-Note-Windows-2026.10.28-r3.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
 
 REQUIREMENTS
 Windows 10 or Windows 11, x64. Microsoft Edge WebView2 Runtime and .NET Framework 4.8 are required. They are normally present on current Windows installations. Official WebView2 download:
@@ -23,7 +23,7 @@ REMOVING THE PROGRAM
 Delete the extracted portable folder, or the installed program folder at %LOCALAPPDATA%\Programs\Another Note and its Start menu shortcut. Your recovery data remains in %LOCALAPPDATA%\Another Note.
 
 BUILD STATUS
-This Windows build is cross-built on Linux. Shared editor/backend tests and package checks are run; native Windows/WebView2 GUI verification is unavailable in the build session.
+This Windows build is cross-built on Linux. Editor/backend and package checks are followed by native WinForms and packaged-app placement checks on a Windows runner. Physical dual-monitor and mixed-DPI hardware is not available on that runner.
 
 THIRD-PARTY SOFTWARE
 See THIRD_PARTY_LICENSES.txt, runtime/LICENSE.txt and the license files beside each bundled Python package. The application uses the system WebView2 Runtime rather than bundling a separate browser.
@@ -130,3 +130,10 @@ usable area and supports monitors left of or above the primary monitor and
 mixed display scaling. The launch position is remembered while the editor
 loads. Moving a detached tab keeps its drop placement. Opening files in an
 existing window does not reposition that window. Help > About shows 2026.10.28-r2.
+
+BUILD 2026.10.28-r3
+The mouse-monitor position is supplied at native window creation and checked
+again after showing the window. If startup changes the position, the host
+corrects it. A last-launch report with window/monitor geometry is written to:
+%LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r3.json
+It contains geometry and errors without note contents. Help > About shows r3.
