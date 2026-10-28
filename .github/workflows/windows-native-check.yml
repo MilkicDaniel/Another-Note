@@ -1,0 +1,42 @@
+name: Native Windows placement check
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'diagnose/windows-placement-*'
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Ensure Microsoft WebView2 is available
+        shell: pwsh
+        run: |
+          $keys = @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}')
+          $installed = $keys | ForEach-Object { Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue } | Where-Object { $_.pv -and $_.pv -ne '0.0.0.0' }
+          if (-not $installed) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebView2Setup.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $signature = Get-AuthenticodeSignature $installer
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*O=Microsoft Corporation*') { throw 'Invalid Microsoft runtime signature' }
+            $result = Start-Process $installer -ArgumentList '/silent','/install' -Wait -PassThru
+            Write-Host "WebView2 installer exit: $($result.ExitCode)"
+          }
+      - name: Download and verify the current Windows package
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'Another-Note-Windows-2026.10.28-r2.zip'
+          Invoke-WebRequest 'https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.28-r2/Another-Note-Windows-2026.10.28-r2.zip' -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '53185aaf8caa52cffc1efc04c85b3f2a826cfe56a92ff6f473e53c51e8fee85a') { throw 'Portable package checksum mismatch' }
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'native-package')
+      - name: Measure real native and packaged window placement
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:RUNNER_TEMP 'native-package/another-note-windows'
+          & "$app/runtime/python.exe" checks/windows_native_placement.py --app $app
+          if ($LASTEXITCODE -ne 0) { throw "Native placement check failed: $LASTEXITCODE" }
