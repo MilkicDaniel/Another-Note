@@ -83,7 +83,7 @@
     }finally{applicationCloseRunning=false;}
   }
   async function closeEditorWindow(){
-    if(applicationCloseRunning||closingFiles.size||movingFiles.size)return false;
+    if(applicationCloseRunning||closingFiles.size||movingFiles.size||typeof collectingTabs!=='undefined'&&(collectingTabs||sendingTabCollection))return false;
     if(native){await request('close_window');return true;}
     try{
       if(!await prepareApplicationClose({preserveDrafts:windowPeers.size===0}))return false;
@@ -92,4 +92,4 @@
       return true;
     }catch(error){toast(`The window stayed open. ${error.message}`);return false;}
   }
-  function shouldConfirmWindowClose(){return Boolean(storageFailure||browserRecoveryPending||movingFiles.size||documentSaves.size||(!native&&windowPeers.size&&openFiles().some(isFileModified)));}
+  function shouldConfirmWindowClose(){return Boolean(storageFailure||browserRecoveryPending||movingFiles.size||documentSaves.size||typeof collectingTabs!=='undefined'&&(collectingTabs||sendingTabCollection)||(!native&&windowPeers.size&&openFiles().some(isFileModified)));}

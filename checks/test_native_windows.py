@@ -21,6 +21,15 @@ class BackendSelectionTests(unittest.TestCase):
 
 
 class NativeWindowTests(unittest.TestCase):
+    def test_window_collection_lists_live_editors_and_routes_through_the_host(self):
+        child=self.detach();self.send(child,'load');self.send(child,'ready',theme='dark')
+        self.send(self.parent,'window_list');self.assertIn(child.window_id,self.replies(self.parent)[-1])
+        self.send(self.parent,'window_message',recipient=child.window_id,token='collect-1',type='collect-offer')
+        script=next(text for text in reversed(self.replies(child)) if text.startswith('window.vistaNotesWindowMessage('))
+        payload=json.loads(script[len('window.vistaNotesWindowMessage('):-2]);self.assertEqual(payload['sender'],self.parent.window_id)
+        child.closing=True
+        self.send(self.parent,'window_message',recipient=child.window_id,token='collect-1',type='collect-offer')
+        self.assertIn('"delivered": false',self.replies(self.parent)[-1])
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

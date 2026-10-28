@@ -823,6 +823,19 @@ def run():
                     self.background(request_id, save)
                 elif command == 'open_tabs':
                     self.background(request_id, lambda: {'openIds': self.hub.open_file_ids()})
+                elif command == 'window_list':
+                    self.reply(request_id, {'windows': [{'id': editor.window_id} for editor in self.application.editors.values()
+                               if editor is not self and editor.loaded and not editor.closed and not editor.closing and not editor.drag_preview_token]})
+                elif command == 'window_message':
+                    recipient, token, kind = data.get('recipient'), data.get('token'), data.get('type')
+                    if (not isinstance(recipient, str) or not isinstance(token, str) or not token or len(token) > 100
+                            or kind not in ('collect-offer', 'collect-progress', 'collect-result', 'collect-cancel')):
+                        raise ValueError('Invalid window message.')
+                    target = self.application.editors.get(recipient)
+                    delivered = bool(target and target is not self and target.loaded and not target.closed and not target.closing and not target.drag_preview_token)
+                    if delivered:
+                        target.evaluate('window.vistaNotesWindowMessage(' + json.dumps({'sender': self.window_id, 'type': kind, 'token': token, 'result': data.get('result')}) + ');')
+                    self.reply(request_id, {'delivered': delivered})
                 elif command == 'move_file':
                     self.application.move_file(self, request_id, data)
                 elif command == 'tab_drop_target':

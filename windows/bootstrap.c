@@ -8,6 +8,13 @@
 #include <wchar.h>
 #include <stdlib.h>
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,PWSTR args,int show) {
+    /* Capture before Python imports and GUI startup can move the pointer. */
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    POINT pointer;
+    if(GetPhysicalCursorPos(&pointer)) {
+        wchar_t point[80];
+        if(swprintf(point,80,L"%ld,%ld",pointer.x,pointer.y)>0)SetEnvironmentVariableW(L"ANOTHER_NOTE_LAUNCH_POINT",point);
+    }
     wchar_t root[32768],python[32768],script[32768],command[32768];
     DWORD n=GetModuleFileNameW(NULL,root,32768);
     if(!n || n>=32768) return 1;

@@ -67,7 +67,7 @@
   function cancelIncomingTransfer(token){const record=incomingTabTransfers.get(token);if(!record)return;record.cancelled=true;if(!record.pending)rollbackIncomingTransfer(record);}
   window.vistaNotesCancelTabTransfer=cancelIncomingTransfer;
   async function acceptTabTransfer(seed,index,token=null){
-    if(!ready||startupBlocked||movingFiles.size||closingFiles.size||applicationCloseRunning||activityBlocked())throw new Error('The destination window is busy.');
+    if(!ready||startupBlocked||movingFiles.size||closingFiles.size||applicationCloseRunning||activityBlocked()||sendingTabCollection)throw new Error('The destination window is busy.');
     const incoming=validateWorkspace(seed.workspace),id=seed.transfer?.fileId,file=incoming.notes.find(item=>item.id===id&&!item.removedAt&&!item.trashedAt);
     if(!file)throw new Error('The transferred file is unavailable.');
     const existing=openFiles().find(item=>item.id===id);
@@ -77,8 +77,8 @@
     clearTabDrop();movingFiles.add(id);setWindowTransferBusy(true);
     try{
       state=mergeWorkspaces(state,incoming);if(seed.handle)await rememberBrowserHandle(id,seed.handle);
-      insertFileTab(id,index);
-      trashView=false;selectNote(id);finishWindowTransfer(seed.transfer);save();await flush();
+      if(!existing||!collectingTabs){insertFileTab(id,index);trashView=false;selectNote(id);finishWindowTransfer(seed.transfer);}
+      save();await flush();
       if(reservation.cancelled)throw new Error('The file move was cancelled.');reservation.pending=false;reservation.preparedSignature=fileSignature(liveNotes().find(item=>item.id===id));window.focus?.();editor.focus();
       return {openIds:[...state.settings.openIds]};
     }catch(error){
@@ -113,6 +113,7 @@
     return promise;
   }
   function handleTabTransferMessage(message,source,ports,fromPort){
+    if(handleTabCollectionMessage(message))return true;
     if(message.type==='port-connect'){
       if((fromPort||source&&windowLinks.has(source))&&ports?.[0])installWindowPort(message.identity,ports[0],message.join,message.coordinator);return true;
     }

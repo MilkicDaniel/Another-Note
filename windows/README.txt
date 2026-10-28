@@ -1,10 +1,10 @@
 Another Note for Windows (64-bit)
 
 INSTALL
-Run Another-Note-Setup-2026.10.28-r3.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
+Run Another-Note-Setup-2026.10.28-r4.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
 
 PORTABLE PACKAGE
-Extract the entire Another-Note-Windows-2026.10.28-r3.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
+Extract the entire Another-Note-Windows-2026.10.28-r4.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
 
 REQUIREMENTS
 Windows 10 or Windows 11, x64. Microsoft Edge WebView2 Runtime and .NET Framework 4.8 are required. They are normally present on current Windows installations. Official WebView2 download:
@@ -137,3 +137,16 @@ again after showing the window. If startup changes the position, the host
 corrects it. A last-launch report with window/monitor geometry is written to:
 %LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r3.json
 It contains geometry and errors without note contents. Help > About shows r3.
+
+BUILD 2026.10.28-r4
+File > Move All Tabs to This Window collects tabs from other app windows in
+order, retaining drafts, file bindings, selections and undo history. Existing
+tabs keep their order and the current tab stays selected. Empty source
+windows close. Busy windows and failed/conflicting moves keep their tabs.
+The EXE captures the physical pointer before Python starts. The Windows host
+selects per-monitor display scaling before creating its windows and rechecks
+placement from the native message loop for the first 800 milliseconds.
+Dragging or resizing cancels those remaining startup checks. The last report
+now includes settled geometry and DPI mode:
+%LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r4.json
+Physical multi-monitor hardware remains untested. Help > About shows r4.

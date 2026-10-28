@@ -102,6 +102,8 @@ class Editor:
             try:report=self.app.platform.confirm_launch_position(self,point)
             except Exception as error:report={'point':point,'ok':False,'error':str(error)}
             self.app.record_window_placement(self,report)
+            try:self.app.platform.watch_launch_position(self,point)
+            except Exception as error:self.app.log('Window placement watch: '+str(error))
     def dispatch(self,data):
         command=data.get('command');app=self.app
         if command=='load':
@@ -130,6 +132,14 @@ class Editor:
         if command=='save':
             snapshot=app.hub.save(self.identity,data.get('state'));app.publish(self,snapshot);return {'saved':True,'openIds':snapshot['settings']['openIds']}
         if command=='open_tabs':return {'openIds':app.hub.open_file_ids()}
+        if command=='window_list':return {'windows':[{'id':editor.identity} for editor in list(app.editors.values()) if editor is not self and editor.loaded and not editor.closed and not editor.closing]}
+        if command=='window_message':
+            recipient=data.get('recipient');token=data.get('token');kind=data.get('type')
+            if not isinstance(recipient,str) or not isinstance(token,str) or not token or len(token)>100 or kind not in ('collect-offer','collect-progress','collect-result','collect-cancel'):raise ValueError('Invalid window message.')
+            target=app.editors.get(recipient)
+            if not target or target is self or target.closed or target.closing or not target.loaded:return {'delivered':False}
+            target.fire('window.vistaNotesWindowMessage('+json.dumps({'sender':self.identity,'type':kind,'token':token,'result':data.get('result')},ensure_ascii=True)+');')
+            return {'delivered':True}
         if command=='read_file':return app.files.read_bound(data.get('fileKey'))
         if command=='check_files':return app.files.check_changes(data.get('files'))
         if command=='open_link':

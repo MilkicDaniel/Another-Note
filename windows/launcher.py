@@ -17,6 +17,15 @@ ROOT=Path(__file__).resolve().parent
 
 def data_folder():return Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData'/'Local'))/'Another Note'
 
+def captured_launch_point(platform):
+    raw=os.environ.pop('ANOTHER_NOTE_LAUNCH_POINT',None)
+    if raw:
+        try:
+            point=tuple(int(part) for part in raw.split(','))
+            if len(point)==2 and all(-(2**31)<=value<2**31 for value in point):return point
+        except ValueError:pass
+    return platform.launch_point()
+
 class DifferentBuildRunning(RuntimeError):pass
 
 class Instance:
@@ -90,7 +99,8 @@ def main():
     if os.name!='nt':raise RuntimeError('Run Another-Note.exe on Windows 10 or 11 (64-bit).')
     platform=WindowsPlatform();instance=None;folder=data_folder()
     try:
-        try:launch_point=platform.launch_point()
+        platform.initialize_dpi()
+        try:launch_point=captured_launch_point(platform)
         except OSError:launch_point=None
         instance=Instance(folder,load_release(ROOT))
         if not instance.primary:instance.forward(sys.argv[1:],launch_point);return 0

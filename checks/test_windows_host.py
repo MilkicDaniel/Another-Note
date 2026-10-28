@@ -22,6 +22,7 @@ class Window:
     def create_file_dialog(self,*args,**kwargs):return self.dialog
     def destroy(self):self.destroyed=True;self.events.closed.emit()
 class Platform:
+    def watch_launch_position(self,editor,point):pass
     def __init__(self):self.messages=[];self.point=(100,100);self.root=0;self.ghost=False;self.keys={1:True,27:False};self.positions=[];self.launch_positions=[]
     def appearance(self,editor,theme):self.theme=theme
     def position(self,editor,anchor):self.positions.append(anchor)
@@ -45,6 +46,17 @@ class GUI:
 def workspace():
     return {'format':'vista-notes','version':1,'updatedAt':100,'activeId':'a','settings':{'openIds':['a'],'theme':'dark'},'notes':[dict(id=id,title=id+'.txt',content='draft '+id,mode='text',createdAt=1,updatedAt=100,trashedAt=0,removedAt=0) for id in 'ab']}
 class WindowsHostTests(unittest.TestCase):
+    def test_window_collection_lists_and_routes_only_live_other_editors(self):
+        target=self.target();unready=self.app.new_window(ids=[])
+        self.assertEqual(self.source.dispatch({'command':'window_list'}),{'windows':[{'id':target.identity}]})
+        message={'command':'window_message','recipient':target.identity,'token':'gather-1','type':'collect-offer'}
+        self.assertEqual(self.source.dispatch(message),{'delivered':True})
+        script=target.window.scripts[-1];payload=json.loads(script[len('window.vistaNotesWindowMessage('):-2])
+        self.assertEqual(payload['sender'],self.source.identity);self.assertEqual(payload['type'],'collect-offer')
+        target.closing=True;self.assertFalse(self.source.dispatch(message)['delivered'])
+        message['recipient']=self.source.identity;self.assertFalse(self.source.dispatch(message)['delivered'])
+        message['type']='evaluate';
+        with self.assertRaisesRegex(ValueError,'Invalid window message'):self.source.dispatch(message)
     def test_image_links_use_the_system_viewer_and_never_import_image_bytes(self):
         path=self.folder/'picture.png';path.write_bytes(b'\x89PNG\r\n\x1a\n\xff')
         self.platform.open_image=Mock()

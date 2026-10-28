@@ -31,6 +31,8 @@ class NativePlacementTests(unittest.TestCase):
         platform=WindowsPlatform.__new__(WindowsPlatform);platform.user=Mock();platform.handle=lambda editor:123
         platform.user.SetThreadDpiAwarenessContext.return_value=457
         platform.user.GetDpiForSystem.return_value=144
+        platform.user.GetDpiForWindow.return_value=144
+        platform.user.GetAwarenessFromDpiAwarenessContext.return_value=2
         platform.user.MonitorFromWindow.return_value=9
         platform.user.MonitorFromPoint.return_value=9;platform.user.SetWindowPos.return_value=1
         def monitor_info(monitor,pointer):
@@ -51,6 +53,32 @@ class NativePlacementTests(unittest.TestCase):
         def physical(pointer):pointer._obj.x=-2200;pointer._obj.y=500;return 1
         platform.user.GetPhysicalCursorPos.side_effect=physical
         self.assertEqual(platform.launch_point(),(-2200,500));platform.user.GetCursorPos.assert_not_called()
+    def test_process_default_uses_per_monitor_v2_before_gui_creation(self):
+        platform,_=self.platform();self.assertTrue(platform.initialize_dpi())
+        self.assertEqual(platform.user.SetProcessDpiAwarenessContext.call_args.args[0].value,C.c_void_p(-4).value)
+    def test_delayed_placement_checks_run_on_native_ticks_and_release_handlers(self):
+        class Event:
+            def __init__(self):self.handlers=[]
+            def __iadd__(self,handler):self.handlers.append(handler);return self
+            def __isub__(self,handler):self.handlers.remove(handler);return self
+            def emit(self):
+                for handler in list(self.handlers):handler()
+        class Timer:
+            def __init__(self):self.Tick=Event();self.Start=Mock();self.Stop=Mock();self.Dispose=Mock();timers.append(self)
+        timers=[];forms=sys.modules['System.Windows.Forms'];forms.Timer=Timer
+        platform,editor=self.platform();editor.closed=False;editor.app=types.SimpleNamespace(record_window_placement=Mock())
+        editor.window.native.ResizeBegin=Event();editor.window.native.FormClosed=Event()
+        platform.pressed=Mock(return_value=False);platform.confirm_launch_position=Mock(side_effect=lambda *_:{'ok':True})
+        platform.watch_launch_position(editor,(4400,300));timer=timers[0]
+        platform.confirm_launch_position.assert_not_called();self.assertEqual(timer.Interval,160)
+        for expected_interval in (240,400):timer.Tick.emit();self.assertEqual(timer.Interval,expected_interval)
+        timer.Tick.emit();self.assertEqual(platform.confirm_launch_position.call_count,3);self.assertIsNone(editor.placement_watch)
+        self.assertEqual(editor.app.record_window_placement.call_args.args[1]['phase'],'settled');timer.Dispose.assert_called_once()
+        self.assertEqual(editor.window.native.ResizeBegin.handlers,[]);self.assertEqual(editor.window.native.FormClosed.handlers,[])
+        platform.watch_launch_position(editor,(4400,300));timers[1].Tick.emit();before=platform.confirm_launch_position.call_count
+        editor.window.native.ResizeBegin.emit();timers[1].Tick.emit()
+        self.assertEqual(platform.confirm_launch_position.call_count,before,'An intentional drag cancels the remaining checks')
+        self.assertIsNone(editor.placement_watch);timers[1].Dispose.assert_called_once()
     def test_initial_coordinates_account_for_winforms_system_scaling(self):
         platform,_=self.platform()
         self.assertEqual(platform.initial_window_bounds((4400,300),1120,790),{'x':2944,'y':211,'width':1120,'height':790})

@@ -46,6 +46,7 @@
         <div class="menu-sep"></div>
         <button data-action="rename">Rename File… <kbd data-shortcut-label="rename">F2</kbd></button><button data-action="duplicate">Duplicate File</button><button id="pinButton" aria-label="Pin file">Pin File</button><button data-action="trash">Move File to Trash</button><button data-action="manageTags">Manage Tags…</button>
         <button data-action="detach">Move File to New Window</button>
+        <button data-action="collectTabs">Move All Tabs to This Window</button>
         <div class="menu-sep"></div>
         <button data-action="close">Close File <kbd data-shortcut-label="close">Ctrl+W</kbd></button><button data-action="closeSaved">Close All Saved Files</button><button data-action="closeWindow">Close Window</button>
         <button data-action="reopen">Reopen Closed File <kbd data-shortcut-label="reopen">Ctrl+Shift+T</kbd></button>
@@ -124,7 +125,7 @@
   <div id="symbolMenu" class="menu-popover" role="menu" aria-label="Code references" tabindex="-1" hidden></div>
   <div id="codeCompletion" class="code-completion" hidden><div id="codeCompletionList" class="completion-list" role="listbox" aria-label="Code suggestions"></div><div class="completion-footer"><div id="codeCompletionDetail" class="completion-detail" aria-live="polite"></div><div class="completion-keys">↑↓ select · Enter insert · Esc close</div></div></div>
   <div id="tabTagMenu" class="menu-popover tab-tag-menu" role="menu" aria-label="File tags" tabindex="-1" hidden></div>
-  <div id="windowTransferStatus" class="window-transfer-status" role="status" aria-live="polite" hidden><span class="transfer-spinner" aria-hidden="true"></span>Opening file in a new window…</div>
+  <div id="windowTransferStatus" class="window-transfer-status" role="status" aria-live="polite" hidden><span class="transfer-spinner" aria-hidden="true"></span>Moving tabs…</div>
   <input id="importFiles" type="file" multiple accept=".md,.markdown,.txt,.text,.log,.sh,.bash,.zsh,.json,.java,.js,.mjs,.cjs,.html,.htm,.css,.py,.pyw,.vnotes" hidden>
   <input id="importFolder" type="file" webkitdirectory multiple hidden>
   <template id="thirdPartyLicenses">/* THIRD_PARTY_LICENSES */</template>

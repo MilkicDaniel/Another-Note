@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import socket
 import sys
 import tempfile
 import time
@@ -64,7 +65,7 @@ def main():
         clr.AddReference('System.Windows.Forms')
         clr.AddReference('System.Drawing')
         from System import Action
-        from System.Drawing import Size
+        from System.Drawing import Size, Point
         from System.Threading import Thread, ThreadStart, ApartmentState
         from System.Windows.Forms import Application, Form, FormStartPosition
 
@@ -88,6 +89,16 @@ def main():
                 shown = rectangle(int(form.Handle.ToInt64()))
                 print(json.dumps({'native_form': {'before': before, 'placed': placed, 'shown': shown, 'point': point}}), flush=True)
                 assert shown == near_pointer_bounds(point, area, shown[2:]), (shown, point, area)
+                reports=[];editor.closed=False;editor.app=types.SimpleNamespace(record_window_placement=lambda _editor,report:reports.append(report))
+                platform.watch_launch_position(editor,point)
+                form.Location=Point(area[2]-650,area[3]-450)
+                deadline=time.monotonic()+4
+                while editor.placement_watch is not None and time.monotonic()<deadline:
+                    Application.DoEvents();time.sleep(.02)
+                settled=rectangle(int(form.Handle.ToInt64()))
+                assert settled==near_pointer_bounds(point,area,settled[2:]),(settled,point,area)
+                assert len(reports)==3 and reports[-1]['phase']=='settled',reports
+                print(json.dumps({'delayed_native_placement':settled,'reports':reports}),flush=True)
             except Exception:
                 errors.append(traceback.format_exc())
             finally:
@@ -135,6 +146,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='another-note-native-',ignore_cleanup_errors=True) as temporary:
         local_data = Path(temporary)
         environment = dict(os.environ, LOCALAPPDATA=str(local_data))
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1',0));debug_port=listener.getsockname()[1]
+        environment['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS']='--remote-debugging-port='+str(debug_port)
         state_folder = local_data / 'Another Note'
         try:
             first_point = (area[0] + 64, area[1] + 64)
@@ -154,6 +168,8 @@ def main():
                 report=json.loads(report_file.read_text())
                 print(json.dumps({'first_placement_report':report}),flush=True)
                 assert report['ok'],report
+                assert report.get('phase')=='settled' and report.get('checks')==3,report
+                assert report.get('dpiAwareness')==2,report
             assert len(first) == 1, 'The packaged editor did not show one ready window'
             first_handle, first_rect = next(iter(first.items()))
             first_expected = near_pointer_bounds(first_point, area, first_rect[2:])
@@ -176,11 +192,15 @@ def main():
                 report=json.loads(report_file.read_text())
                 print(json.dumps({'second_placement_report':report}),flush=True)
                 assert report['ok'],report
+                assert report.get('phase')=='settled' and report.get('checks')==3,report
+                assert report.get('dpiAwareness')==2,report
             assert len(second) == 2, 'Relaunch did not show a second editor'
             assert second[first_handle] == first_rect, 'Relaunch moved the existing window'
             new_rect = next(rect for handle, rect in second.items() if handle != first_handle)
             second_expected = near_pointer_bounds(second_point, area, new_rect[2:])
             assert all(abs(a-b) <= 2 for a,b in zip(new_rect, second_expected)), (new_rect, second_expected)
+            subprocess.run(['node','--experimental-websocket',str(Path(__file__).with_name('windows_native_tabs.cjs')),str(debug_port)],check=True,timeout=90)
+            assert len(app_windows())==1,'Consolidation left an empty native source window open'
         except Exception:
             errors.append(traceback.format_exc())
         finally:

@@ -97,7 +97,7 @@ jobs:
             if ((Get-FileHash (Join-Path 'release-downloads' $Matches[2]) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1]) { throw 'Release asset checksum mismatch' }
           }
           Expand-Archive "release-downloads/Another-Note-Windows-$version.zip" -DestinationPath (Join-Path $env:RUNNER_TEMP 'native-package')
-      - name: Measure real native and packaged window positions
+      - name: Measure native placement and consolidate packaged tabs
         shell: pwsh
         run: |
           $app = Join-Path $env:RUNNER_TEMP 'native-package/another-note-windows'
@@ -128,11 +128,13 @@ jobs:
           cat > "$notes" <<EOF
           Windows installer and portable ZIP for Another Note $version.
 
-          Launching Another Note again without file arguments opens a new window with one blank tab. New application windows receive their mouse-monitor coordinates at creation, then verify and correct the shown window's monitor and bounds. Existing windows and drafts stay open. File arguments still open in the existing app.
+          File > Move All Tabs to This Window gathers tabs from the other open windows, preserving drafts, selection, undo and disk bindings. Empty source windows close, while busy or unsuccessful moves retain their tabs. The destination's current tab stays selected.
+
+          Windows captures the physical mouse position in the EXE, selects per-monitor display scaling before window creation, and verifies placement after queued startup events. Dragging or resizing cancels the remaining startup checks. The reported physical second-monitor issue has not been reproduced on the single-display runner.
 
           Close all Another Note windows before updating. Install with Another-Note-Setup-$version.exe, or extract Another-Note-Windows-$version.zip and run Another-Note.exe inside it.
 
-          The package build verifies dependency hashes, installer payloads and editor versions. Native WinForms and packaged-app first/repeat launch placement checks run on Windows before publication. The runner has one display; physical dual-monitor and mixed-DPI hardware were not available.
+          The package build verifies dependency hashes, installer payloads and editor versions. Native WinForms delayed-placement, packaged first/repeat launches, and actual editor tab consolidation with draft/selection/undo checks run on Windows before publication. The runner has one display; physical dual-monitor and mixed-DPI hardware were not available.
           EOF
           if gh release view "$version" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-is-draft" 2>/dev/null; then
             test "$(cat "$RUNNER_TEMP/release-is-draft")" = true

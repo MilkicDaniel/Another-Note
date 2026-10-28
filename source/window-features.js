@@ -110,13 +110,14 @@
     save();
   }
   function setWindowTransferBusy(busy){
+    busy=busy||collectingTabs||Boolean(sendingTabCollection);
     const app=document.querySelector('.app-window');app.inert=busy;clearTimeout(windowTransferStatusTimer);windowTransferStatusTimer=null;
     $('windowTransferStatus').hidden=true;
     if(busy)windowTransferStatusTimer=setTimeout(()=>{windowTransferStatusTimer=null;$('windowTransferStatus').hidden=false;},180);
     editor.readOnly=busy||startupBlocked||Boolean(note()?.trashedAt);
   }
   async function moveFileToWindow(id=state.activeId,point={},targetId=null,index=null){
-    if(!ready||startupBlocked||movingFiles.size||closingFiles.size||applicationCloseRunning)return false;
+    if(!ready||startupBlocked||movingFiles.size||closingFiles.size||applicationCloseRunning||collectingTabs||sendingTabCollection&&point.collectionToken!==sendingTabCollection.token)return false;
     if(!openFiles().some(file=>file.id===id))return false;
     let pending=null;movingFiles.add(id);
     try{
@@ -150,7 +151,7 @@
     }finally{if(pending){clearTimeout(pending.timer);pendingWindowMoves.delete(pending.token);}movingFiles.delete(id);setWindowTransferBusy(false);}
   }
   function wireWindowFeatures(){
-    document.addEventListener('keydown',event=>{if(movingFiles.size||emptyWindowClosing){event.preventDefault();event.stopImmediatePropagation();}},true);
+    document.addEventListener('keydown',event=>{if(movingFiles.size||emptyWindowClosing||collectingTabs||sendingTabCollection){event.preventDefault();event.stopImmediatePropagation();}},true);
     if(native)return;
     windowMessageReceiver=receive;
     try{if(window.BroadcastChannel){windowChannel=new window.BroadcastChannel(WINDOW_MESSAGE);windowChannel.onmessage=event=>receive(event.data,null);}}catch(_){}
@@ -183,7 +184,7 @@
       if(handled){}
       else if(message.type==='tabs'&&Array.isArray(message.openIds)){windowPeers.set(message.sender,{openIds:message.openIds});if(ready)renderRecentFiles();}
       else if(message.type==='workspace')receiveWorkspaceUpdate(message.state);
-      else if(message.type==='hello'){postWindowMessage({type:'tabs',openIds:state?.settings.openIds||[]});}
+      else if(message.type==='hello'){windowPeers.set(message.sender,{openIds:Array.isArray(message.openIds)?message.openIds:[]});postWindowMessage({type:'tabs',openIds:state?.settings.openIds||[]});}
       else if(message.type==='gone'){windowPeers.delete(message.sender);windowPorts.get(message.sender)?.close();windowPorts.delete(message.sender);dropLayouts.delete(message.sender);if(source&&source.closed&&windowLinks.get(source)?.identity===message.sender)windowLinks.delete(source);if(ready)save();}
       try{if(source)windowChannel?.postMessage(message);}catch(_){}
       for(const [id,port] of windowPorts)if(id!==fromPort){try{port.postMessage(message);}catch(_){}}
@@ -192,5 +193,5 @@
     window.addEventListener('message',event=>{try{receive(event.data,event.source,event.ports);}catch(_){}});
     window.addEventListener('pagehide',()=>{rememberWindowTabs();postWindowMessage({type:'gone'});windowChannel?.close();for(const port of windowPorts.values())port.close();windowPorts.clear();});
     window.addEventListener('pageshow',event=>{if(event.persisted){try{if(window.BroadcastChannel){windowChannel=new window.BroadcastChannel(WINDOW_MESSAGE);windowChannel.onmessage=e=>receive(e.data,null);}if(window.opener&&!window.opener.closed&&windowToken())window.opener.postMessage({kind:WINDOW_MESSAGE,type:'reconnect',token:windowToken(),sender:windowInstanceId},'*');}catch(_){}postWindowMessage({type:'hello'});lastPublishedTabs='';lastPublishedFiles='';publishWindowState();}});
-    postWindowMessage({type:'hello'});
+    postWindowMessage({type:'hello',openIds:state?.settings.openIds||[]});
   }

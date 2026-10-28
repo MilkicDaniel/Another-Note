@@ -141,3 +141,11 @@ New Windows application windows open near the mouse on the monitor where you lau
 Windows supplies explicit initial coordinates before the toolkit first shows a native window. It then verifies the actual monitor and bounds after the window appears, correcting placement if startup changed it. Initial coordinates account for the system display scale; final placement uses physical monitor coordinates. Detached tabs retain their drop position.
 
 A small last-launch report is kept locally at `%LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r3.json`. It contains window and monitor geometry and errors, with no note contents. Release checks now include real WinForms and packaged-app launches on a Windows runner. Physical multi-monitor hardware is unavailable in CI.
+
+## Build 2026.10.28-r4
+
+**File → Move All Tabs to This Window** gathers tabs from the other open app windows. It appends them in source order, retains the destination's current tab, and shows all tab tags. Draft text, disk bindings, cursor/selection and bounded undo history use the existing acknowledged transfer path. Identical existing tabs keep their position and local undo stack; conflicting edits, busy dialogs and failed transfers retain the original tabs. Empty source windows close after their tabs finish moving. The command also works between connected standalone HTML windows.
+
+Windows now captures the physical pointer in the native EXE before Python startup and selects per-monitor DPI awareness before creating any editor windows. Three native message-loop checks over the first 800 milliseconds verify placement after Show/Activate and queued startup layout; intentional dragging or resizing cancels those checks. The versioned local placement report includes settled geometry and window DPI awareness. These changes address additional startup paths; the reported physical second-monitor failure has not been reproduced on the single-display Windows runner.
+
+Release validation covers delayed native placement and packaged Windows tab consolidation, drafts, tab order, selection and undo/redo. Fedora's positioning behavior is unchanged.

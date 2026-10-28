@@ -42,6 +42,7 @@ javascript = javascript.replace('/* TAG_FEATURES */', (ROOT / 'source/tag-featur
 javascript = javascript.replace('/* MENU_CONTROLS */', (ROOT / 'source/menu-controls.js').read_text())
 javascript = javascript.replace('/* WINDOW_FEATURES */', (ROOT / 'source/window-features.js').read_text())
 javascript = javascript.replace('/* TAB_TRANSFER */', (ROOT / 'source/tab-transfer.js').read_text())
+javascript = javascript.replace('/* WINDOW_COLLECTION */', (ROOT / 'source/window-collection.js').read_text())
 javascript = javascript.replace('/* LIVE_TAB_DRAG */', (ROOT / 'source/live-tab-drag.js').read_text())
 javascript = javascript.replace('/* FILE_FEATURES */', (ROOT / 'source/file-features.js').read_text())
 javascript = javascript.replace('/* FILE_FOLDERS */', (ROOT / 'source/file-folders.js').read_text())

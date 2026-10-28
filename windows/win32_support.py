@@ -27,7 +27,11 @@ class WindowsPlatform:
         bind(self.user,'MonitorFromWindow',[ptr,W.DWORD],ptr)
         bind(self.user,'GetMonitorInfoW',[ptr,C.POINTER(MonitorInfo)],W.BOOL)
         bind(self.user,'SetThreadDpiAwarenessContext',[ptr],ptr)
+        bind(self.user,'SetProcessDpiAwarenessContext',[ptr],W.BOOL)
         bind(self.user,'GetDpiForSystem',[],W.UINT)
+        bind(self.user,'GetDpiForWindow',[ptr],W.UINT)
+        bind(self.user,'GetWindowDpiAwarenessContext',[ptr],ptr)
+        bind(self.user,'GetAwarenessFromDpiAwarenessContext',[ptr],C.c_int)
         bind(self.user,'GetAsyncKeyState',[C.c_int],C.c_short)
         bind(self.user,'WindowFromPoint',[W.POINT],ptr)
         bind(self.user,'GetAncestor',[ptr,W.UINT],ptr)
@@ -73,6 +77,32 @@ class WindowsPlatform:
         p=W.POINT()
         if not self.user.GetPhysicalCursorPos(C.byref(p)):raise OSError('Could not read the launch mouse position.')
         return p.x,p.y
+    def initialize_dpi(self):
+        # Window DPI mode belongs to its creation context, not to a later
+        # SetWindowPos call. Select it before importing the GUI toolkit.
+        return bool(self.user.SetProcessDpiAwarenessContext(C.c_void_p(-4)))
+    def watch_launch_position(self,editor,point):
+        # Show/Activate and DPI layout may queue work. Verify from the native
+        # message loop after those callbacks have run. Stop if the user drags
+        # or resizes so startup recovery never fights an intentional move.
+        def start():
+            from System.Windows.Forms import Timer
+            form=editor.window.native;timer=Timer();timer.Interval=160;checks=0;stopped=False
+            def stop(*_):
+                nonlocal stopped
+                if stopped:return
+                stopped=True
+                timer.Stop();timer.Tick-=tick;form.ResizeBegin-=stop;form.FormClosed-=stop;timer.Dispose();editor.placement_watch=None
+            def tick(*_):
+                nonlocal checks
+                if stopped:return
+                if editor.closed or self.pressed(1):stop();return
+                report=self.confirm_launch_position(editor,point);checks+=1;report.update(phase='settled',checks=checks)
+                editor.app.record_window_placement(editor,report)
+                if checks>=3:stop()
+                else:timer.Interval=240 if checks==1 else 400
+            timer.Tick+=tick;form.ResizeBegin+=stop;form.FormClosed+=stop;editor.placement_watch=(timer,tick,stop);timer.Start()
+        editor.ui(start)
     @contextmanager
     def dpi_context(self,mode=-4):
         previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(mode))
@@ -119,7 +149,8 @@ class WindowsPlatform:
         def confirm():
             with self.dpi_context():
                 monitor,area=self.monitor_area(point);handle=self.handle(editor)
-                report.update(requestedMonitor=int(monitor),workArea=area)
+                context=self.user.GetWindowDpiAwarenessContext(handle)
+                report.update(requestedMonitor=int(monitor),workArea=area,dpi=int(self.user.GetDpiForWindow(handle)),dpiAwareness=int(self.user.GetAwarenessFromDpiAwarenessContext(context)))
                 for attempt in range(4):
                     rect=W.RECT()
                     if not self.user.GetWindowRect(handle,C.byref(rect)):raise OSError('Could not verify the shown window.')

@@ -1,4 +1,4 @@
-import json,types,unittest
+import json,os,types,unittest
 from unittest.mock import Mock,patch
 from windows import launcher
 
@@ -14,6 +14,17 @@ class Connection:
         return json.dumps(self.reply).encode()
 
 class WindowsInstanceTests(unittest.TestCase):
+    def test_bootstrap_pointer_is_consumed_once_before_python_can_recapture_it(self):
+        platform=Mock();platform.launch_point.return_value=(100,100)
+        with patch.dict(os.environ,{'ANOTHER_NOTE_LAUNCH_POINT':'4400,-300'}):
+            self.assertEqual(launcher.captured_launch_point(platform),(4400,-300))
+            self.assertNotIn('ANOTHER_NOTE_LAUNCH_POINT',os.environ);platform.launch_point.assert_not_called()
+            self.assertEqual(launcher.captured_launch_point(platform),(100,100))
+    def test_invalid_bootstrap_pointer_falls_back_to_the_live_physical_cursor(self):
+        for raw in ('bad','1','1,2,3','4294967296,0'):
+            platform=Mock();platform.launch_point.return_value=(-2200,500)
+            with self.subTest(raw=raw),patch.dict(os.environ,{'ANOTHER_NOTE_LAUNCH_POINT':raw}):
+                self.assertEqual(launcher.captured_launch_point(platform),(-2200,500))
     def setUp(self):
         self.instance=launcher.Instance.__new__(launcher.Instance);self.instance.pipe='test-pipe';self.instance.build='2026.10.27-r5';self.instance.editor_digest='f'*64;self.instance.key=lambda:b'key'
         self.editor=types.SimpleNamespace(closed=False,deliver_imports=Mock(),window=types.SimpleNamespace(show=Mock()));self.fresh=types.SimpleNamespace(window=types.SimpleNamespace(show=Mock()));self.app=types.SimpleNamespace(editors={'main':self.editor},new_window=Mock(return_value=self.fresh))

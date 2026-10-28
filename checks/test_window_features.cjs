@@ -1,6 +1,6 @@
 // Real transfer/controller code: a tab is released only after its destination acknowledges readiness.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const root=path.join(__dirname,'..'),main=fs.readFileSync(path.join(root,'source/app.js'),'utf8'),moduleCode=fs.readFileSync(path.join(root,'source/window-features.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'source/tab-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'source/live-tab-drag.js'),'utf8');
+const root=path.join(__dirname,'..'),main=fs.readFileSync(path.join(root,'source/app.js'),'utf8'),moduleCode=fs.readFileSync(path.join(root,'source/window-features.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'source/tab-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'source/window-collection.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'source/live-tab-drag.js'),'utf8');
 const plain=value=>JSON.parse(JSON.stringify(value));
 function extract(name){const start=main.search(new RegExp(`^  (?:async )?function ${name}\\(`,'m'));assert.ok(start>=0,name);const rest=main.slice(start),end=rest.slice(1).search(/^  (?:async )?function /m);return rest.slice(0,end+1);}
 function target(){const handlers=new Map();return {addEventListener(type,fn){if(!handlers.has(type))handlers.set(type,[]);handlers.get(type).push(fn);},emit(type,event){for(const handler of handlers.get(type)||[])handler(event);}};}
@@ -39,6 +39,70 @@ function fixture(native=true){
   return f;
 }
 (async()=>{
+  // Consolidation drives the real source/target transfer functions through
+  // the native relay, preserving drafts and collecting sources sequentially.
+  function collectionNetwork(windows){
+    for(const [id,f] of windows){
+      f.onRequest=async(command,args)=>{
+        if(command==='window_list')return {windows:[...windows].filter(([other,item])=>other!==id&&!item.window.closed).map(([other])=>({id:other}))};
+        if(command==='window_message'){
+          const target=windows.get(args.recipient);if(!target||target.window.closed)return {delivered:false};
+          queueMicrotask(()=>target.window.vistaNotesWindowMessage({...args,sender:id}));return {delivered:true};
+        }
+        if(command==='move_file'){
+          const target=windows.get(args.targetId);if(f.rejectMove)throw Error('Destination did not acknowledge the tab');
+          const seed=f.call('seedForFile',args.fileId,args.transfer),token=`move-${id}-${args.fileId}`;
+          await target.call('acceptTabTransfer',seed,args.index,token);target.call('commitIncomingTransfer',token);return {moved:true};
+        }
+        if(command==='close_empty_window'){f.window.close();return {closed:true};}
+        return {moved:true};
+      };
+    }
+  }
+  {
+    const destination=fixture(),first=fixture(),second=fixture();
+    const extra=['c','d'].map(id=>({id,title:id+'.txt',mode:'text',content:'draft '+id,createdAt:1,updatedAt:110,removedAt:0,trashedAt:0,savedState:null,savedSignature:'unsaved'}));
+    for(const f of [destination,first,second])f.state().notes.push(...plain(extra));
+    destination.state().settings.openIds=['d'];destination.state().activeId='d';destination.state().settings.tagFilter={kind:'tag',tag:'Work'};
+    second.state().settings.openIds=['c'];second.state().activeId='c';
+    collectionNetwork(new Map([['destination',destination],['first',first],['second',second]]));
+    assert.equal(await destination.call('collectAllTabs'),true);
+    await first.tick();
+    assert.deepEqual(plain(destination.state().settings.openIds),['d','a','b','c']);assert.equal(destination.state().activeId,'d');
+    assert.equal(first.window.closed,true);assert.equal(second.window.closed,true);assert.equal(destination.window.closed,false);
+    assert.equal(destination.state().notes.find(file=>file.id==='a').content,'unsaved JSON draft');
+    assert.equal(destination.state().notes.find(file=>file.id==='a').fileKey,'disk-key');
+    assert.equal(destination.context.histories.get('a').undo[0].content,'{}');assert.equal(destination.context.cursors.get('a').start,2);
+    assert.equal(destination.state().settings.tagFilter.kind,'all');assert.equal(destination.app.inert,false);
+    assert.match(destination.messages.at(-1),/Moved 3 tabs/);
+    assert.ok([destination,first,second].every(f=>!f.requests.some(item=>item.command==='save_file')),'Collecting never writes unsaved drafts to their disk files');
+  }
+  {
+    const destination=fixture(),source=fixture();destination.state().settings.openIds=['b','a'];destination.state().activeId='b';
+    const prior=destination.context.histories.get('a');collectionNetwork(new Map([['destination',destination],['source',source]]));
+    assert.equal(await destination.call('collectAllTabs'),true);assert.deepEqual(plain(destination.state().settings.openIds),['b','a']);
+    await source.tick();
+    assert.equal(destination.context.histories.get('a'),prior,'An identical existing tab keeps its undo stack and position');assert.equal(source.window.closed,true);
+  }
+  for(const failure of ['busy','unacknowledged','conflicting']){
+    const destination=fixture(),source=fixture();destination.state().settings.openIds=['b'];destination.state().activeId='b';
+    if(failure==='busy')source.context.activityBlocked=()=>true;
+    if(failure==='unacknowledged')source.rejectMove=true;
+    if(failure==='conflicting'){destination.state().settings.openIds.push('a');destination.state().notes[0].content='different local draft';}
+    collectionNetwork(new Map([['destination',destination],['source',source]]));
+    assert.equal(await destination.call('collectAllTabs'),false);
+    assert.deepEqual(plain(source.state().settings.openIds),['a','b']);assert.equal(source.window.closed,false);
+    assert.equal(source.state().notes[0].content,'unsaved JSON draft');assert.equal(destination.app.inert,false);assert.equal(source.app.inert,false);
+    if(failure==='conflicting')assert.equal(destination.state().notes[0].content,'different local draft');
+  }
+  {
+    const destination=fixture();destination.onRequest=command=>command==='window_list'?{windows:[{id:'unresponsive'}]}:{delivered:true};
+    const collecting=destination.call('collectAllTabs');await destination.tick();
+    const watchdog=[...destination.timers.values()].find(timer=>timer.delay===45000);assert.ok(watchdog);watchdog.callback();
+    assert.equal(await collecting,false);assert.equal(destination.app.inert,false);
+    assert.equal(vm.runInContext('pendingTabCollections.size',destination.context),0);
+    assert.ok(destination.requests.some(item=>item.args.type==='collect-cancel'));
+  }
   // Transfer history is bounded before cloning and excludes live Find sessions.
   {
     const f=fixture(),old={content:'x'.repeat(5*1024*1024),start:0,end:0};
@@ -277,6 +341,16 @@ function fixture(native=true){
     assert.equal(await moving,false);f.state().settings.openIds=['b'];assert.deepEqual(plain(f.call('browserStorageSnapshot').settings.openIds),['b']);
   }
   // Reattach between two frontend instances over either the tab bar or editor.
+  {
+    const channels=new Set();class Channel{constructor(){channels.add(this);}postMessage(message){for(const peer of channels)if(peer!==this)queueMicrotask(()=>{if(channels.has(peer))peer.onmessage?.({data:plain(message)});});}close(){channels.delete(this);}}
+    const destination=fixture(false),source=fixture(false);destination.window.BroadcastChannel=source.window.BroadcastChannel=Channel;
+    destination.state().settings.openIds=['b'];destination.state().activeId='b';source.state().settings.openIds=['a'];
+    destination.call('wireWindowFeatures');source.call('wireWindowFeatures');await source.tick();
+    assert.equal(await destination.call('collectAllTabs'),true);await source.tick();
+    assert.deepEqual(plain(destination.state().settings.openIds),['b','a']);assert.equal(destination.state().activeId,'b');
+    assert.equal(source.window.closed,true);assert.equal(destination.context.histories.get('a').undo[0].content,'{}');
+    assert.equal(destination.app.inert,false);assert.equal(destination.timers.size,0);destination.window.close();
+  }
   {
     const f=fixture(false),layout={left:1000,right:2000,top:0,bottom:800,bar:{left:1000,right:2000,top:30,bottom:70},barMargin:24,index:1,token:'held',focusedAt:100,slots:[{left:1050,right:1210},{left:1211,right:1371},{left:1372,right:1532}]};
     f.context.receivingLayout=layout;vm.runInContext('dropLayouts.set("receiver",receivingLayout)',f.context);
