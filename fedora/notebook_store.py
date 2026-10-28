@@ -26,7 +26,10 @@ def merge_recent_settings(current, previous):
     shortcuts = ({'shortcutBindings': previous.get('shortcutBindings', {}),
                   'shortcutsUpdatedAt': previous['shortcutsUpdatedAt']}
                  if stamp(previous.get('shortcutsUpdatedAt')) > stamp(current.get('shortcutsUpdatedAt')) else {})
-    return {**current, **shortcuts, 'recentClearedAt': cleared,
+    preferences = ({'editorPreferences': copy.deepcopy(previous.get('editorPreferences', {})),
+                    'editorPreferencesUpdatedAt': previous['editorPreferencesUpdatedAt']}
+                   if stamp(previous.get('editorPreferencesUpdatedAt')) > stamp(current.get('editorPreferencesUpdatedAt')) else {})
+    return {**current, **shortcuts, **preferences, 'recentClearedAt': cleared,
             'recentFiles': sorted(records.values(), key=lambda item:(item['closedAt'], item['id']))[-30:]}
 
 

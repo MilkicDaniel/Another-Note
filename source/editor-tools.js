@@ -78,12 +78,13 @@
   async function prettyFormat(){
     const file=note();if(!file||file.trashedAt||formatRunning||activityBlocked())return;
     if(file.mode==='text'||file.mode==='markdown')return toast('Choose a programming file type to format this file.');
-    const id=file.id,text=file.content,mode=file.mode,start=editor.selectionStart,end=editor.selectionEnd;formatRunning=true;$('formatButton').disabled=true;
+    const id=file.id,text=file.content,mode=file.mode,start=editor.selectionStart,end=editor.selectionEnd,direction=editor.selectionDirection||'none';formatRunning=true;$('formatButton').disabled=true;
     try{
-      const formatted=await editorJob('format',{text,mode,tabSize:editorTabSize(),filename:file.title||`untitled.${{python:'py',bash:'sh',javascript:'js'}[mode]||mode}`});
+      const preferences=typeof EditorStyle!=='undefined'?EditorStyle.profile(state.settings.editorPreferences,mode,editorTabSize()):undefined;
+      const formatted=await editorJob('format',{text,mode,tabSize:editorTabSize(),preferences,filename:file.title||`untitled.${{python:'py',bash:'sh',javascript:'js'}[mode]||mode}`});
       if(note()?.id!==id||note().content!==text||note().mode!==mode)return toast('The file changed while formatting. Run Format File again.');
       if(formatted===text)return toast('File is already formatted.');
-      replaceText(0,text.length,formatted,Math.min(start,formatted.length),Math.min(end,formatted.length));toast('Formatted file. Use Undo to restore the previous text.');
+      replaceText(0,text.length,formatted,Math.min(start,formatted.length),Math.min(end,formatted.length));editor.setSelectionRange(Math.min(start,formatted.length),Math.min(end,formatted.length),direction);toast('Formatted file. Use Undo to restore the previous text.');
     }catch(error){toast(`Could not format file: ${error.message}`,6500);}finally{formatRunning=false;$('formatButton').disabled=false;}
   }
   function editorTabSize(){const size=Number(state.settings.tabSize);return [2,4,8].includes(size)?size:2;}

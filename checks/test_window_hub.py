@@ -12,6 +12,16 @@ from notebook_store import NotebookStore, WorkspaceHub
 
 
 class WindowJournalTests(unittest.TestCase):
+    def test_editor_preferences_and_reset_survive_stale_window_saves_and_restart(self):
+        child=self.hub.load('child',['b'])['state']
+        preferences={'appearance':{'fontFamily':'Consolas','fontStyle':'italic','colors':{'dark':{'keyword':'#c0ffee'}}},'formatting':{'java':{'bracePolicy':'always'}}}
+        self.parent['settings'].update(editorPreferences=preferences,editorPreferencesUpdatedAt=200)
+        self.hub.save('main',self.parent);self.hub.save('child',child)
+        self.assertEqual(self.hub.state['settings']['editorPreferences'],preferences)
+        child['settings'].update(editorPreferences={},editorPreferencesUpdatedAt=300)
+        self.hub.save('child',child);self.hub.save('main',self.parent)
+        restored=WorkspaceHub(self.store).load('restart')['state']['settings']
+        self.assertEqual(restored['editorPreferences'],{});self.assertEqual(restored['editorPreferencesUpdatedAt'],300)
     def test_shortcuts_survive_stale_window_saves_and_reset(self):
         child = self.hub.load('child', ['b'])['state']
         self.parent['settings'].update(shortcutBindings={'export': ['Ctrl+Alt+S']}, shortcutsUpdatedAt=200)

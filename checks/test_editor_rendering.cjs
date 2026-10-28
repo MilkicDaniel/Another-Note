@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const main=fs.readFileSync(path.join(__dirname,'../source/app.js'),'utf8');
 function extract(source,name){const start=source.search(new RegExp(`^  (?:async )?function ${name}\\(`,'m'));assert.ok(start>=0,name);const rest=source.slice(start),end=rest.slice(1).search(/^  (?:async )?function /m);return rest.slice(0,end+1);}
 const counters={measurements:0,gutters:0,highlights:0,syntax:0};
-let fastMeasure=false,cellMeasures=0,activeCaretTop=null,activeCaretReads=0;
+let fastMeasure=false,proportional=false,cellMeasures=0,activeCaretTop=null,activeCaretReads=0;
 const styles={lineHeight:'24px',fontSize:'15px',fontFamily:'monospace',tabSize:'2',letterSpacing:'0px',wordSpacing:'0px',paddingLeft:'4px',paddingRight:'23px'};
 const classes=()=>{const set=new Set();return {add:name=>set.add(name),remove:name=>set.delete(name),contains:name=>set.has(name)};};
 const decode=text=>text.replace(/&(amp|lt|gt|quot|#39);/g,(_,name)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"})[name]);
@@ -16,7 +16,7 @@ function node(id=''){
       }}));
     },
     getBoundingClientRect(){return {top:0,left:0};},
-    querySelector(selector){if(selector==='[data-editor-cell]'&&fastMeasure)return {getBoundingClientRect:()=>{cellMeasures++;return {width:640};}};if(selector==='[data-active-caret]'){const prefix=decode(html.split('<span')[0]),columns=Math.max(1,Math.floor(parseFloat(this.style.width||100)/10));return {getBoundingClientRect:()=>{activeCaretReads++;return {top:activeCaretTop??Math.floor(prefix.length/columns)*parseFloat(styles.lineHeight)+3,left:0};}};}if(selector!=='[data-find-caret]')return null;const prefix=decode(html.split('<span')[0]),columns=Math.max(1,Math.floor(parseFloat(this.style.width||100)/10));return {getBoundingClientRect:()=>({top:this.style.whiteSpace==='pre'?0:Math.floor(prefix.length/columns)*parseFloat(styles.lineHeight),left:(prefix.length%columns)*10})};},
+    querySelector(selector){if(selector==='[data-editor-cell]'&&fastMeasure)return {getBoundingClientRect:()=>{cellMeasures++;return {width:640};}};if(['[data-editor-wide]','[data-editor-narrow]'].includes(selector)&&fastMeasure)return {getBoundingClientRect:()=>({width:proportional?(selector==='[data-editor-wide]'?900:300):640})};if(selector==='[data-active-caret]'){const prefix=decode(html.split('<span')[0]),columns=Math.max(1,Math.floor(parseFloat(this.style.width||100)/10));return {getBoundingClientRect:()=>{activeCaretReads++;return {top:activeCaretTop??Math.floor(prefix.length/columns)*parseFloat(styles.lineHeight)+3,left:0};}};}if(selector!=='[data-find-caret]')return null;const prefix=decode(html.split('<span')[0]),columns=Math.max(1,Math.floor(parseFloat(this.style.width||100)/10));return {getBoundingClientRect:()=>({top:this.style.whiteSpace==='pre'?0:Math.floor(prefix.length/columns)*parseFloat(styles.lineHeight),left:(prefix.length%columns)*10})};},
   };
 }
 const elements=new Map(),$=id=>{if(!elements.has(id))elements.set(id,node(id));return elements.get(id);};
@@ -58,6 +58,9 @@ fastMeasure=true;state.settings.wrap=true;editor.value=('short line\n'.repeat(20
 vm.runInContext('editorLayout.cellKey=null',context);const previousMeasures=counters.measurements;context.paintEditor();
 assert.equal(cellMeasures,1);assert.equal(counters.measurements-previousMeasures,3,'Only long, Unicode and tabbed lines need layout reads');
 editor.value+='\nmore text';context.paintEditor();assert.equal(cellMeasures,1,'Typing reuses the measured font cell');
+styles.fontStyle='italic';const beforeStyle=cellMeasures;context.paintEditor();assert.equal(cellMeasures,beforeStyle+1,'Font styles invalidate character and row measurements');
+proportional=true;styles.fontFamily='proportional';const beforeProportional=counters.measurements;context.paintEditor();assert.ok(counters.measurements-beforeProportional>2000,'Proportional fonts use actual row measurement instead of a fixed-width shortcut');
+proportional=false;styles.fontFamily='monospace';context.paintEditor();
 const beforeHidden=counters.measurements;editor.clientWidth=0;editor.value='x'.repeat(200)+'\nshort';context.paintEditor();assert.equal(counters.measurements,beforeHidden,'An unmapped view does not measure text at a one-pixel width');
 editor.clientWidth=227;context.paintEditor();assert.equal(counters.measurements,beforeHidden+1,'The first real allocation measures the wrapping line');context.scrollToEditorMatch(201);assert.equal(editor.scrollTop,224,'Restored viewport geometry remains accurate for search');
 // Saved baselines avoid hashing a large file again on each keystroke.

@@ -39,12 +39,12 @@
     const thumb=$('minimapViewport');thumb.style.top=`${view.top}px`;thumb.style.height=`${view.thumb}px`;
     panel.setAttribute('aria-valuemax',String(Math.round(view.maxScroll)));panel.setAttribute('aria-valuenow',String(Math.min(Math.round(view.maxScroll),Math.round(editor.scrollTop))));
     const occurrences=typeof currentOccurrenceHighlights==='function'?currentOccurrenceHighlights():null,matches=occurrences?.matches;
-    const ratio=Math.min(2,window.devicePixelRatio||1),key=[file.id,file.content,file.mode,document.body.dataset.theme,state.settings.fontSize,editorLayout.key,width,height,view.offset,ratio,matches];
+    const ratio=Math.min(2,window.devicePixelRatio||1),key=[file.id,file.content,file.mode,document.body.dataset.theme,state.settings.editorPreferencesUpdatedAt,state.settings.fontSize,editorLayout.key,width,height,view.offset,ratio,matches];
     if(minimapPaintKey&&key.every((value,i)=>value===minimapPaintKey[i]))return;minimapPaintKey=key;
     const context=canvas.getContext('2d');if(!context)return;
-    canvas.width=Math.round(width*ratio);canvas.height=Math.round(height*ratio);context.setTransform(ratio,0,0,ratio,0,0);context.clearRect(0,0,width,height);context.font=`${fontSize*scale}px ${styles.fontFamily}`;context.textBaseline='top';
-    const colors=getComputedStyle(document.body),palette={};for(const name of ['text','comment','string','key','number','keyword','variable','muted'])palette[name]=colors.getPropertyValue('--'+name);
-    const kindColor={comment:'comment',string:'string',property:'key',number:'number',keyword:'keyword',variable:'variable',command:'key',operator:'muted',heading:'keyword',fence:'comment',code:'string',emphasis:'key'};
+    canvas.width=Math.round(width*ratio);canvas.height=Math.round(height*ratio);context.setTransform(ratio,0,0,ratio,0,0);context.clearRect(0,0,width,height);context.font=`${styles.fontStyle||'normal'} ${styles.fontWeight||'400'} ${fontSize*scale}px ${styles.fontFamily}`;context.textBaseline='top';
+    const colors=getComputedStyle(document.body),palette={};for(const name of ['text','comment','string','property','command','number','keyword','variable','operator','heading','fence','code','emphasis'])palette[name]=colors.getPropertyValue('--syntax-'+name)||colors.getPropertyValue('--'+({property:'key',command:'key',operator:'muted',heading:'keyword',fence:'comment',code:'string',emphasis:'key'}[name]||name));
+    const kindColor={comment:'comment',string:'string',property:'property',number:'number',keyword:'keyword',variable:'variable',command:'command',operator:'operator',heading:'heading',fence:'fence',code:'code',emphasis:'emphasis'};
     const starts=editorLineStarts(),offsets=editorLayout.offsets,fromY=Math.max(0,(view.offset-8)/scale),toY=(height+view.offset)/scale;
     let first=0,high=starts.length;while(first+1<high){const mid=(first+high)>>1;if(offsets[mid]<=fromY)first=mid;else high=mid;}
     let last=first;while(last+1<starts.length&&offsets[last+1]<=toY)last++;

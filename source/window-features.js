@@ -27,7 +27,7 @@
     rememberWindowTabs();
     const ids=state.settings.openIds,tabs=JSON.stringify(ids);
     if(tabs!==lastPublishedTabs){lastPublishedTabs=tabs;postWindowMessage({type:'tabs',openIds:ids});}
-    const files=JSON.stringify([state.tags,state.tagChanges,state.dictionaryChanges,state.notes.map(file=>[file.id,file.updatedAt,file.savedSignature,file.removedAt,file.tagsUpdatedAt])]);
+    const files=JSON.stringify([state.tags,state.tagChanges,state.dictionaryChanges,state.settings.editorPreferencesUpdatedAt,state.notes.map(file=>[file.id,file.updatedAt,file.savedSignature,file.removedAt,file.tagsUpdatedAt])]);
     if(files!==lastPublishedFiles){lastPublishedFiles=files;postWindowMessage({type:'workspace',state});}
   }
   function browserStorageSnapshot(){
@@ -39,7 +39,7 @@
   function receiveWorkspaceUpdate(value){
     if(!ready||!state||startupBlocked)return;
     try{
-      const remote=validateWorkspace(value),active=note(),before=active?JSON.stringify(active):'';
+      const remote=validateWorkspace(value),active=note(),before=active?JSON.stringify(active):'',preferencesStamp=state.settings.editorPreferencesUpdatedAt||0;
       updateNativeOpenTabs(remote.settings.openIds,false);state=mergeWorkspaces(state,remote);
       let next=note();
       if(active&&JSON.stringify(next)!==before){
@@ -49,6 +49,7 @@
         }else if(next&&!movingFiles.has(active.id))selectNote(next.id);
         else if(!next){state.activeId=state.settings.openIds.find(id=>liveNotes().some(file=>file.id===id))||null;renderAll();}
       }
+      if((state.settings.editorPreferencesUpdatedAt||0)!==preferencesStamp&&typeof applySettings==='function')applySettings();
       renderList();refreshSpellcheck();if($('dictionaryDialog').open)renderDictionary();if($('manageTagsDialog').open)renderManageTags();
     }catch(_){}
   }

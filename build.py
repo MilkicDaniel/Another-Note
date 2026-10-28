@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent
 VERSION=read_version(ROOT)
 html = (ROOT / 'source/shell.html').read_text().replace('/* APP_BUILD */', VERSION)
 html = html.replace('/* APP_ICON */', base64.b64encode((ROOT / 'source/app-icon.png').read_bytes()).decode('ascii'))
-html = html.replace('/* APP_CSS */', '\n'.join((ROOT/'source'/name).read_text() for name in ['app.css','color-picker.css','editor-minimap.css','editor-scrollbars.css','editor-structure.css','search-fields.css','help-dialogs.css']))
+html = html.replace('/* APP_CSS */', '\n'.join((ROOT/'source'/name).read_text() for name in ['app.css','color-picker.css','editor-minimap.css','editor-scrollbars.css','editor-structure.css','search-fields.css','help-dialogs.css','editor-preferences.css']))
 html = html.replace('/* THIRD_PARTY_LICENSES */', html_escape((ROOT / 'source/vendor/THIRD_PARTY_LICENSES.txt').read_text()))
 assets=json.loads((ROOT/'source/vendor/editor-assets.json').read_text())
 bootstrap=(ROOT/'source/vendor/worker-loader.js').read_bytes()
@@ -19,7 +19,7 @@ html=html.replace('/* EDITOR_BOOTSTRAP_BASE64 */',base64.b64encode(bootstrap).de
 workers={}
 for name,keys,vendor,modules in [
     ('spelling',('enAff','enDic','gbAff','gbDic'),'spelling-vendor.js',('editor-word-utils.js','editor-worker.js')),
-    ('format',('ruff','shell','treeSitter','java'),'format-vendor.js',('format-worker.js',)),
+    ('format',('ruff','shell','treeSitter','java'),'format-vendor.js',('editor-style-config.js','format-worker.js')),
 ]:
     worker='const EDITOR_ASSETS='+json.dumps({key:assets[key] for key in keys},ensure_ascii=False,separators=(',',':'))+';\n'
     if name=='format':
@@ -27,6 +27,8 @@ for name,keys,vendor,modules in [
     worker+=(ROOT/'source/vendor'/vendor).read_text()+'\n'+'\n'.join((ROOT/'source'/module).read_text() for module in modules)
     workers[name]=gzip.compress(worker.encode(),compresslevel=9,mtime=0)
 javascript = (ROOT / 'source/app.js').read_text()
+javascript = javascript.replace('/* EDITOR_STYLE_CONFIG */', (ROOT/'source/editor-style-config.js').read_text())
+javascript = javascript.replace('/* EDITOR_PREFERENCES */', (ROOT/'source/editor-preferences.js').read_text())
 javascript = javascript.replace('/* SYNTAX_FORMATS */', (ROOT / 'source/syntax-formats.js').read_text())
 javascript = javascript.replace('/* EDITOR_RENDERING */', (ROOT / 'source/editor-rendering.js').read_text())
 javascript = javascript.replace('/* CODE_PREVIEWS */', (ROOT/'source/code-previews.js').read_text())

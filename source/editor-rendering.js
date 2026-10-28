@@ -28,18 +28,19 @@
     const availableWidth=editor.clientWidth-(parseFloat(styles.paddingLeft)||0)-(parseFloat(styles.paddingRight)||0),width=Math.max(1,availableWidth);
     const showNumbers=note().lineNumbers!==false;
     const foldKey=typeof codeFoldKey==='function'?codeFoldKey():'';
-    const key=JSON.stringify([showNumbers,foldKey,state.settings.wrap,state.settings.wrap?width:0,styles.fontFamily,styles.fontSize,styles.lineHeight,styles.tabSize,styles.letterSpacing,styles.wordSpacing]);
+    const key=JSON.stringify([showNumbers,foldKey,state.settings.wrap,state.settings.wrap?width:0,styles.fontFamily,styles.fontWeight,styles.fontStyle,styles.fontSize,styles.lineHeight,styles.tabSize,styles.letterSpacing,styles.wordSpacing]);
     if(editorLayout.key===key)return;
     const hidden=starts.map((_,line)=>typeof codeLineHidden==='function'&&codeLineHidden(line));
     const offsets=[],heights=[];let offset=0;
     // An unmapped native view has no usable width. Its first allocation
     // invalidates this key; measuring it as a one-pixel editor is wasted work.
     if(state.settings.wrap&&availableWidth>0){
-      const cellKey=JSON.stringify([styles.fontFamily,styles.fontSize,styles.lineHeight,styles.letterSpacing,styles.wordSpacing]);
+      const cellKey=JSON.stringify([styles.fontFamily,styles.fontWeight,styles.fontStyle,styles.fontSize,styles.lineHeight,styles.letterSpacing,styles.wordSpacing]);
       if(editorLayout.cellKey!==cellKey){
         lineMeasure.style.width='max-content';lineMeasure.style.whiteSpace='pre';
-        lineMeasure.innerHTML='<span data-editor-cell>'+('0'.repeat(64))+'</span>';
+        lineMeasure.innerHTML='<span data-editor-cell>'+('0'.repeat(64))+'</span><span data-editor-wide>'+('W'.repeat(64))+'</span><span data-editor-narrow>'+('i'.repeat(64))+'</span>';
         editorLayout.cellWidth=lineMeasure.querySelector('[data-editor-cell]')?.getBoundingClientRect().width/64||0;
+        const wide=lineMeasure.querySelector('[data-editor-wide]')?.getBoundingClientRect().width/64,narrow=lineMeasure.querySelector('[data-editor-narrow]')?.getBoundingClientRect().width/64;editorLayout.fixedWidth=Number.isFinite(wide)&&Number.isFinite(narrow)&&Math.abs(wide-editorLayout.cellWidth)<.05&&Math.abs(narrow-editorLayout.cellWidth)<.05;
         editorLayout.cellKey=cellKey;lineMeasure.style.whiteSpace='';
       }
       lineMeasure.style.width=`${width}px`;
@@ -49,7 +50,7 @@
         const end=index+1<starts.length?starts[index+1]-1:editor.value.length,text=typeof codeDisplayText==='function'?codeDisplayText(starts[index],end):editor.value.slice(starts[index],end);
         // Short ASCII lines in the fixed-width editor cannot wrap. Tabs,
         // Unicode and longer lines retain exact browser measurement.
-        if(editorLayout.cellWidth&&text.length*editorLayout.cellWidth<=width-editorLayout.cellWidth&&/^[\x20-\x7e]*$/.test(text))heights[index]=lineHeight;
+        if(editorLayout.fixedWidth&&editorLayout.cellWidth&&text.length*editorLayout.cellWidth<=width-editorLayout.cellWidth&&/^[\x20-\x7e]*$/.test(text))heights[index]=lineHeight;
         else measured.push({index,text});
       }
       lineMeasure.innerHTML=measured.map(line=>`<div>${escape(line.text)||'\u200b'}</div>`).join('');

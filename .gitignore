@@ -6,3 +6,5 @@ dist/
 fedora/Another-Note.html
 fedora/spelling-worker.js.gz
 fedora/format-worker.js.gz
+node_modules
+tooling/editor-vendor/generated/

@@ -73,6 +73,7 @@
         <div class="menu-sep"></div><button data-insert="bash">Insert Bash Block</button><button data-insert="json">Insert JSON Block</button><button data-insert="text">Insert Code Block</button>
       </div></div>
       <div class="menu"><button class="menu-trigger" aria-haspopup="true" aria-expanded="false">Preferences</button><div class="menu-popover" hidden>
+        <button data-action="editorPreferences">Editor Appearance &amp; Formatting…</button><div class="menu-sep"></div>
         <div class="tag-menu-heading">Theme</div><button role="menuitemradio" aria-checked="false" data-theme-choice="dark">Dark</button><button role="menuitemradio" aria-checked="false" data-theme-choice="light">Light</button><button role="menuitemradio" aria-checked="true" data-theme-choice="system">Follow System</button>
         <div class="menu-sep"></div><div class="tag-menu-heading">Tab size</div><button type="button" role="menuitemradio" data-tab-size="2" aria-checked="true">2 spaces</button><button type="button" role="menuitemradio" data-tab-size="4" aria-checked="false">4 spaces</button><button type="button" role="menuitemradio" data-tab-size="8" aria-checked="false">8 spaces</button>
         <div class="menu-sep"></div><button data-action="shortcuts">Keyboard Shortcuts…</button><button data-action="dictionary">Personal Dictionary…</button>
@@ -129,6 +130,41 @@
   <input id="importFiles" type="file" multiple accept=".md,.markdown,.txt,.text,.log,.sh,.bash,.zsh,.json,.java,.js,.mjs,.cjs,.html,.htm,.css,.py,.pyw,.vnotes" hidden>
   <input id="importFolder" type="file" webkitdirectory multiple hidden>
   <template id="thirdPartyLicenses">/* THIRD_PARTY_LICENSES */</template>
+  <dialog id="editorPreferencesDialog" aria-labelledby="editorPreferencesTitle" aria-describedby="editorPreferencesDescription">
+    <form id="editorPreferencesForm">
+      <div class="dialog-heading preferences-heading"><h2 id="editorPreferencesTitle">Editor Appearance &amp; Formatting</h2><button type="button" id="preferencesClose" class="icon-button" aria-label="Cancel editor preferences">×</button></div>
+      <p id="editorPreferencesDescription" class="preferences-intro">Preview your style, then Apply. Formatting rules are used by Format File; changing these preferences keeps your file text intact.</p>
+      <div id="preferencesTabs" class="preferences-tabs" role="tablist" aria-label="Editor preferences">
+        <button type="button" id="preferencesAppearanceTab" role="tab" aria-selected="true" aria-controls="preferencesAppearance" data-preferences-section="appearance">Appearance</button>
+        <button type="button" id="preferencesFormattingTab" role="tab" aria-selected="false" aria-controls="preferencesFormatting" tabindex="-1" data-preferences-section="formatting">Formatting</button>
+      </div>
+      <div class="preferences-layout">
+        <div class="preferences-controls">
+          <section id="preferencesAppearance" role="tabpanel" aria-labelledby="preferencesAppearanceTab">
+            <h3>Editor font</h3>
+            <div class="preferences-font-grid">
+              <label class="preference-field full-width"><span>Font family</span><input id="preferencesFontFamily" type="text" list="preferencesFontChoices" maxlength="100" placeholder="System monospace" autocomplete="off" aria-describedby="preferencesFontHint"></label>
+              <datalist id="preferencesFontChoices"><option value="Consolas"><option value="Cascadia Mono"><option value="Cascadia Code"><option value="DejaVu Sans Mono"><option value="Liberation Mono"><option value="JetBrains Mono"><option value="Fira Code"><option value="Courier New"></datalist>
+              <label class="preference-field"><span>Font style</span><select id="preferencesFontStyle"><option value="regular">Regular</option><option value="bold">Bold</option><option value="italic">Italic</option><option value="bold-italic">Bold italic</option></select></label>
+              <label class="preference-field"><span>Size (px)</span><input id="preferencesFontSize" type="number" min="8" max="72" step="1" value="15" required></label>
+              <label class="preference-field"><span>Line height</span><input id="preferencesLineHeight" type="number" min="1.2" max="2.4" step="0.1" value="1.6" required></label>
+            </div>
+            <p id="preferencesFontHint" class="preferences-hint">Use an installed font, or leave the name blank for the default monospace font. Missing fonts fall back to monospace.</p>
+            <div class="preference-palette-header"><label class="preference-field"><span>Syntax palette</span><select id="preferencesPalette"><option value="dark">Dark theme</option><option value="light">Light theme</option></select></label><button type="button" id="preferencesResetPalette" class="preferences-small-button">Reset palette</button></div>
+            <p class="preferences-hint">Each app theme has its own colors. Choose a color square or enter a six-digit HEX color.</p>
+            <div id="preferencesColors"></div>
+          </section>
+          <section id="preferencesFormatting" role="tabpanel" aria-labelledby="preferencesFormattingTab" hidden>
+            <h3>Language formatting</h3><p class="preferences-hint">Rules are saved separately for each language. The preview uses a sample, and Format File applies the rules to the current file with Undo available.</p>
+            <div id="preferencesFormatFields"></div><p id="preferencesFormatHint" class="preferences-hint"></p><button type="button" id="preferencesResetFormat" class="preferences-small-button">Reset this language</button>
+          </section>
+        </div>
+        <div class="preferences-preview-pane"><div class="preferences-preview-heading"><strong>Preview</strong><label for="preferencesLanguage" class="sr-only">Preview language</label><select id="preferencesLanguage"><option value="javascript">JavaScript</option></select></div><pre id="preferencesPreview" class="preferences-preview" tabindex="0" aria-label="Editor style sample"><code id="preferencesPreviewCode"></code></pre><p id="preferencesPreviewStatus" class="preferences-preview-status" role="status" aria-live="polite">Sample preview</p></div>
+      </div>
+      <p id="preferencesMessage" role="status" aria-live="polite"></p>
+      <div class="preferences-footer"><button type="button" id="preferencesResetAll" class="preferences-reset">Restore defaults</button><button type="button" id="preferencesCancel">Cancel</button><button type="submit" id="preferencesApply" class="primary-button">Apply</button></div>
+    </form>
+  </dialog>
   <dialog id="licensesDialog" aria-labelledby="licensesTitle"><form method="dialog"><div class="dialog-heading"><h2 id="licensesTitle">Third-Party Licenses</h2><button class="icon-button" aria-label="Close third-party licenses">×</button></div><pre id="licensesText"></pre><div class="dialog-actions"><button value="done">Close</button></div></form></dialog>
   <dialog id="renameDialog"><form method="dialog"><h2>Rename File</h2><label for="noteTitle">File name</label><input id="noteTitle" aria-label="File name" placeholder="untitled" maxlength="250" autocomplete="off"><div class="dialog-actions"><button value="done">Close</button></div></form></dialog>
   <dialog id="tagDialog" aria-labelledby="tagDialogTitle" aria-describedby="tagDialogDescription"><form id="tagForm" method="dialog"><h2 id="tagDialogTitle">Create Tag</h2><p id="tagDialogDescription"></p><label for="tagName">Tag name</label><input id="tagName" maxlength="64" autocomplete="off" required><div class="dialog-actions"><button type="button" id="cancelTagButton">Cancel</button><button type="submit" class="primary-button">Create Tag</button></div></form></dialog>

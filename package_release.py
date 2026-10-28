@@ -10,7 +10,8 @@ def source_paths(root=ROOT):
     root=Path(root)
     for path in sorted(root.rglob('*')):
         relative=path.relative_to(root)
-        if not path.is_file() or any(part in {'.git','.openai','__pycache__','artifacts','dist'} for part in relative.parts):continue
+        if not path.is_file() or any(part in {'.git','.openai','__pycache__','node_modules','artifacts','dist'} for part in relative.parts):continue
+        if relative.parts[:3]==('tooling','editor-vendor','generated'):continue
         if path.suffix in {'.pyc','.pyo'} or path.name=='.DS_Store':continue
         yield path
 
