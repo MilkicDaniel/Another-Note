@@ -66,6 +66,11 @@ class WindowsHostTests(unittest.TestCase):
         self.temp.cleanup()
     def target(self):
         target=self.app.new_window(['b']);target.dispatch({'command':'load'});target.dispatch({'command':'ready','theme':'light','build':self.app.build});return target
+    def test_fresh_launch_window_loads_no_existing_tabs_and_waits_until_ready_to_show(self):
+        fresh=self.app.new_window(ids=[]);loaded=fresh.dispatch({'command':'load'})['state']
+        self.assertEqual(loaded['settings']['openIds'],[]);self.assertIsNone(loaded['activeId']);self.assertEqual([note['content'] for note in loaded['notes']],['draft a','draft b'])
+        self.assertEqual(self.app.hub.tabs[self.source.identity],['a']);self.assertFalse(fresh.window.visible)
+        fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build});self.assertTrue(fresh.window.visible)
     def transfer(self,**extra):return dict(fileId='a',transfer={'fileId':'a','cursor':{'start':2,'end':5},'history':{'undo':[{'content':'old'}],'redo':[]}},**extra)
     def test_workspace_and_draft_survive_restart(self):
         loaded=host.NotebookStore(self.app.store.folder).read()['state'];self.assertEqual(loaded['notes'][0]['content'],'draft a');self.assertTrue(self.source.window.visible);self.assertEqual(self.source.dispatch({'command':'load'})['liveDrag'],True)

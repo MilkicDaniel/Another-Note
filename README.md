@@ -4,9 +4,9 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open `Another-Note-2026.10.27-r6.html` in your browser.
+- **HTML:** open `Another-Note-2026.10.28-r1.html` in your browser.
 - **Windows:** run `Another-Note-Setup-2026.10.27-r6.exe`, or extract `Another-Note-Windows-2026.10.27-r6.zip` and run `Another-Note.exe` inside it.
-- **Fedora:** extract `Another-Note-Fedora-2026.10.27-r6.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **Fedora:** extract `Another-Note-Fedora-2026.10.28-r1.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
@@ -125,3 +125,9 @@ Windows installer and portable filenames include the build number. Windows loads
 ## Build 2026.10.27-r6
 
 Selected line breaks have a one-character highlight cell, making selected empty lines visible. A focused selection has an I-shaped caret at its active end. The current line number, row highlight and status-bar position follow that end for forward and backward selections, including wrapped rows. The indicators do not add characters to the file or clipboard. Undo, tab changes and window transfers preserve selection direction.
+
+## Build 2026.10.28-r1
+
+Launching the Fedora app again while it is running opens a separate window with one new blank tab. Existing windows and drafts stay open, and the first launch after closing the app still restores the previous session. The installed app icon has a **New Window** action for opening a window on the current GNOME workspace. GNOME can focus an existing window when its running icon is clicked normally; use **New Window** or Ctrl+click the icon to request another window. File launches continue to open their files in the existing app.
+
+The Windows launcher source follows the same repeat-launch behavior for its next build. Windows downloads remain at 2026.10.27-r6 until a new Windows build is requested.

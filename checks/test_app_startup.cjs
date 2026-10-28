@@ -32,7 +32,7 @@ function browserDatabase(workspace,failHandles=false){
     setImmediate(()=>tx.oncomplete?.());return tx;
   }};
 }
-async function launch({native=false,failHandles=false,fallback=false,theme='light',systemDark=false,transfer=null,nativeWindows=1}={}){
+async function launch({native=false,failHandles=false,fallback=false,theme='light',systemDark=false,transfer=null,nativeWindows=1,freshWindow=false}={}){
   const resolved=theme==='system'?(systemDark?'dark':'light'):theme;
   const workspace={format:'vista-notes',version:1,updatedAt:100,activeId:'existing',settings:{theme,openIds:['existing']},
     notes:[{id:'existing',title:'keep.json',content:'{"keep":true}',mode:'json',createdAt:1,updatedAt:100,trashedAt:0,removedAt:0,fileKey:'remembered-key',diskPath:'/files/keep.json'}]};
@@ -46,7 +46,7 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
   const db=browserDatabase(workspace,failHandles);
   const indexedDB={open(){const op={};queueMicrotask(()=>{op.result=db;op.onsuccess();});return op;}};
   if(native)window.webkit={messageHandlers:{vistaNotes:{postMessage(raw){const data=JSON.parse(raw);messages.push(data);queueMicrotask(()=>{
-    let result={};if(data.command==='load')result={state:plain(workspace),transfer,windowId:'main',nativeDrag:'gesture'};
+    let result={};if(data.command==='load'){result={state:plain(workspace),transfer,windowId:freshWindow?'window-relaunch':'main',nativeDrag:'gesture'};if(freshWindow){result.state.settings.openIds=[];result.state.activeId=null;}}
     else if(data.command==='save'){saved.push(data.state);result={saved:true};}
     else if(data.command==='versions_load')result={versions:[]};
     else if(data.command==='versions_store')result={saved:true};
@@ -67,6 +67,17 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
   vm.runInContext(instrumented,context);await context.startup;await context.appTest.flush();
   assert.equal(elements.get('saveState').hidden,true,'Successful recovery stays quiet in the footer');assert.equal(elements.get('saveLabel').textContent,'');
   assert.equal(elements.get('errorBanner').hidden,true,elements.get('errorBanner').textContent);
+  if(freshWindow){
+    const state=context.appTest.getState(),blank=state.notes.find(note=>note.id===state.activeId);
+    assert.equal(state.notes.length,2,'A relaunch keeps the existing draft and adds one new file');
+    assert.deepEqual(plain(state.settings.openIds),[blank.id],'Only the new file is open in the new window');
+    assert.notEqual(blank.id,'existing');assert.equal(blank.content,'');assert.equal(blank.title,'');assert.equal(blank.mode,'text');
+    assert.equal(state.notes.find(note=>note.id==='existing').content,'{"keep":true}','Existing draft text is unchanged');
+    assert.equal(elements.get('editor').value,'');assert.equal(context.appTest.isFileModified(blank),false);
+    assert.equal(saved.at(-1).activeId,blank.id,'The fresh tab is included in recovery');
+    assert.ok(messages.find(message=>message.command==='ready'&&!message.failed));
+    return {context,elements,messages,window,saved};
+  }
   if(transfer){const editor=elements.get('editor');assert.equal(editor.selectionStart,transfer.cursor.start);assert.equal(editor.selectionEnd,transfer.cursor.end);assert.equal(editor.scrollTop,transfer.cursor.top);assert.equal(editor.scrollLeft,transfer.cursor.left);assert.equal(context.appTest.getHistory(transfer.fileId).undo[0].content,'previous');}
   assert.equal(context.appTest.getState().notes.length,1);assert.equal(elements.get('editor').value,'{"keep":true}');
   assert.equal(context.appTest.getState().notes[0].fileKey,'remembered-key');
@@ -82,6 +93,7 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
   return {context,elements,messages,window,saved};
 }
 (async()=>{
+  await launch({native:true,freshWindow:true});
   {
     const {context,elements}=await launch(),api=context.appTest,editor=elements.get('editor');
     editor.setSelectionRange(0,6,'backward');api.actions.new();api.actions.previous();

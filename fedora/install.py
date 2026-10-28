@@ -46,7 +46,10 @@ def install(data_home, bin_dir):
         'TryExec=/usr/bin/python3\nIcon=' + APP_ID + '\n'
         'Terminal=false\nCategories=Utility;TextEditor;\n'
         'MimeType=text/plain;text/markdown;application/json;text/x-shellscript;text/x-java;application/javascript;text/javascript;text/html;text/css;text/x-python;application/x-vista-notes;\n'
-        'StartupNotify=true\nStartupWMClass=' + APP_ID + '\n', encoding='utf-8')
+        'StartupNotify=true\nStartupWMClass=' + APP_ID + '\n'
+        'SingleMainWindow=false\nActions=new-window;\n\n'
+        '[Desktop Action new-window]\nName=New Window\n'
+        'Exec=/usr/bin/python3 ' + desktop_argument(app_dir / 'launcher.py') + '\n', encoding='utf-8')
     (mime_packages / 'vista-notes.xml').write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">\n'

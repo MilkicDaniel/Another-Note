@@ -125,6 +125,11 @@ class PersistenceTests(unittest.TestCase):
         self.assertTrue(desktop.is_file())
         self.assertIn('Data with spaces', desktop.read_text())
         self.assertIn(' %F\n', desktop.read_text())
+        self.assertIn('SingleMainWindow=false\nActions=new-window;\n', desktop.read_text())
+        action = desktop.read_text().split('[Desktop Action new-window]\n', 1)[1]
+        self.assertIn('Name=New Window\n', action)
+        self.assertIn('Exec=/usr/bin/python3 ', action)
+        self.assertNotIn('%F', action)
 
 
 if __name__ == '__main__':

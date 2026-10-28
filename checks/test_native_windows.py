@@ -94,6 +94,55 @@ class NativeWindowTests(unittest.TestCase):
         self.send(self.parent,'detach_file','move-1',fileId='a',transfer={'fileId':'a','cursor':{'start':1,'end':3,'top':10,'left':0},'history':{'undo':[],'redo':[]}})
         return next(item for item in self.app.editors.values() if item is not self.parent)
 
+    def test_first_launch_restores_tabs_but_relaunch_opens_an_independent_empty_window(self):
+        self.assertEqual(self.app.hub.tabs[self.parent.window_id], ['a', 'b'])
+        self.parent.window.present.reset_mock()
+        self.parent.view.evaluate_javascript.reset_mock()
+        self.app.handlers['activate'](self.app)
+        child = next(item for item in self.app.editors.values() if item is not self.parent)
+        self.assertEqual(child.initial_ids, [])
+        self.assertIs(self.app.primary, self.parent)
+        self.send(child, 'load')
+        loaded = self.app.hub.load(child.window_id)['state']
+        self.assertEqual(loaded['settings']['openIds'], [])
+        self.assertIsNone(loaded['activeId'])
+        self.assertEqual([note['content'] for note in loaded['notes']], ['draft a', 'draft b'])
+        self.assertEqual(self.app.hub.tabs[self.parent.window_id], ['a', 'b'])
+        child.window.present.assert_not_called()
+        self.send(child, 'ready', theme='dark')
+        child.window.present.assert_called_once()
+        self.parent.window.present.assert_not_called()
+        self.parent.view.evaluate_javascript.assert_not_called()
+
+    def test_repeated_launches_create_separate_windows_even_while_one_is_starting(self):
+        for _ in range(2):
+            self.app.handlers['activate'](self.app)
+        children = [item for item in self.app.editors.values() if item is not self.parent]
+        self.assertEqual(len(children), 2)
+        self.assertNotEqual(children[0].window_id, children[1].window_id)
+        for child in children:
+            self.assertEqual(child.initial_ids, [])
+            self.send(child, 'load')
+            self.assertEqual(self.app.hub.tabs[child.window_id], [])
+        self.assertEqual(self.app.hub.tabs[self.parent.window_id], ['a', 'b'])
+
+    def test_relaunch_while_an_existing_window_is_closing_keeps_its_tabs_separate(self):
+        self.parent.closing = True
+        self.app.handlers['activate'](self.app)
+        child = next(item for item in self.app.editors.values() if item is not self.parent)
+        self.send(child, 'load')
+        self.assertEqual(self.app.hub.tabs[child.window_id], [])
+        self.assertEqual(self.app.hub.tabs[self.parent.window_id], ['a', 'b'])
+
+    def test_open_with_file_launch_still_delivers_files_to_the_existing_window(self):
+        file = Mock()
+        file.get_path.return_value = '/files/another.txt'
+        with patch.object(self.parent, 'deliver_imports') as deliver:
+            self.app.open_documents(self.app, [file], 1, '')
+        self.assertEqual(len(self.app.editors), 1)
+        self.assertEqual(self.parent.pending_imports, ['/files/another.txt'])
+        deliver.assert_called_once()
+
     def test_classic_tabs_keep_webkit_pointer_handling(self):
         self.parent.window.set_child.assert_called_once_with(self.parent.view)
         self.parent.view.add_controller.assert_not_called()

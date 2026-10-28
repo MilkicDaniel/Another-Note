@@ -57,10 +57,11 @@ class Instance:
             paths=request.get('paths')
         else:paths=request
         if not isinstance(paths,list) or any(not isinstance(p,str) for p in paths):return
-        editor=next((e for e in list(app.editors.values()) if not e.closed),None)
+        editor=app.new_window(ids=[]) if not paths else next((e for e in list(app.editors.values()) if not e.closed),None)
         if editor:
-            if paths:editor.deliver_imports(paths)
-            editor.window.show()
+            if paths:
+                editor.deliver_imports(paths)
+                editor.window.show()
             if structured:connection.send_bytes(json.dumps({'status':'accepted','build':self.build,'sha256':self.editor_digest}).encode())
     def serve(self,app):
         def receive():

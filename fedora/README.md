@@ -18,6 +18,10 @@ python3 install.py
 
 Open **Another Note** from the applications menu, run `~/.local/bin/another-note`, or run `python3 launcher.py` from the extracted folder. Open a file from a terminal with `~/.local/bin/another-note /path/to/file.json`.
 
+Launching the app again while it is running opens a new window with one blank tab. Your other windows and drafts stay open. The first launch after closing the app restores the previous session.
+
+To open it on your current GNOME workspace, right-click its app icon and choose **New Window**, or Ctrl+click the icon. A normal click on a running app icon can be handled by GNOME itself and take you to an existing window. Run `install.py` again when updating so the app-icon action is refreshed.
+
 The Fedora package includes `spelling-worker.js.gz` and `format-worker.js.gz`. Keep them beside the HTML and launcher when running from the extracted folder; the installer copies them automatically. Their compressed data loads on demand and is cached across windows. Each window has its own workers. An empty file starts without either worker.
 
 Updating keeps the workspace and replaces the previous app icon. The old launch command still works. Editor dropdowns match the app's theme; native file dialogs follow the system theme. **Preferences → Dark / Light / Follow System** changes the editor theme. The window appears after the editor has applied its saved or system theme, with a matching background to avoid a white startup frame.

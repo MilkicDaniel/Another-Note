@@ -1257,11 +1257,9 @@ def run():
             return editor
 
         def activate_window(self, _app):
-            active = next((editor for editor in self.editors.values() if not editor.closed and not editor.closing), None)
-            if active:
-                active.activate_window(self)
-            else:
-                self.new_window()
+            # Restore the previous session only in the first window. A later
+            # launch starts with no tabs, so the editor creates one blank file.
+            self.new_window(open_ids=[] if self.editors else None)
 
         def open_documents(self, _app, files, _count, _hint):
             available = [item for item in self.editors.values() if not item.closed and not item.closing]

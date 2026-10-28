@@ -16,7 +16,7 @@ class Connection:
 class WindowsInstanceTests(unittest.TestCase):
     def setUp(self):
         self.instance=launcher.Instance.__new__(launcher.Instance);self.instance.pipe='test-pipe';self.instance.build='2026.10.27-r5';self.instance.editor_digest='f'*64;self.instance.key=lambda:b'key'
-        self.editor=types.SimpleNamespace(closed=False,deliver_imports=Mock(),window=types.SimpleNamespace(show=Mock()));self.app=types.SimpleNamespace(editors={'main':self.editor})
+        self.editor=types.SimpleNamespace(closed=False,deliver_imports=Mock(),window=types.SimpleNamespace(show=Mock()));self.fresh=types.SimpleNamespace(window=types.SimpleNamespace(show=Mock()));self.app=types.SimpleNamespace(editors={'main':self.editor},new_window=Mock(return_value=self.fresh))
     def request(self,**extra):return dict(protocol=2,build=self.instance.build,sha256=self.instance.editor_digest,paths=[],**extra)
     def test_matching_instances_forward_files_after_a_version_handshake(self):
         connection=Connection(reply={'status':'accepted','build':self.instance.build,'sha256':self.instance.editor_digest})
@@ -40,6 +40,12 @@ class WindowsInstanceTests(unittest.TestCase):
         self.editor.deliver_imports.assert_called_once_with(['file.txt']);self.editor.window.show.assert_called_once();self.assertEqual(connection.sent[0]['status'],'accepted')
     def test_existing_legacy_launchers_can_still_forward_to_the_new_build(self):
         self.instance.receive(self.app,Connection(request=['file.txt']));self.editor.deliver_imports.assert_called_once_with(['file.txt']);self.editor.window.show.assert_called_once()
+    def test_relaunch_without_files_creates_a_fresh_window_without_showing_existing_ones(self):
+        connection=Connection(request=self.request());self.instance.receive(self.app,connection)
+        self.app.new_window.assert_called_once_with(ids=[]);self.editor.window.show.assert_not_called();self.editor.deliver_imports.assert_not_called();self.fresh.window.show.assert_not_called()
+        self.assertEqual(connection.sent[0]['status'],'accepted')
+    def test_legacy_relaunch_without_files_also_creates_a_fresh_window(self):
+        self.instance.receive(self.app,Connection(request=[]));self.app.new_window.assert_called_once_with(ids=[]);self.editor.window.show.assert_not_called()
     def test_invalid_paths_do_not_import_or_show(self):
         request=self.request();request['paths']=[{}];self.instance.receive(self.app,Connection(request=request));self.editor.deliver_imports.assert_not_called();self.editor.window.show.assert_not_called()
 
