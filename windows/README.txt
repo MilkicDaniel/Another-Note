@@ -1,10 +1,10 @@
 Another Note for Windows (64-bit)
 
 INSTALL
-Run Another-Note-Setup-2026.10.27-r6.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
+Run Another-Note-Setup-2026.10.28-r1.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
 
 PORTABLE PACKAGE
-Extract the entire Another-Note-Windows-2026.10.27-r6.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
+Extract the entire Another-Note-Windows-2026.10.28-r1.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
 
 REQUIREMENTS
 Windows 10 or Windows 11, x64. Microsoft Edge WebView2 Runtime and .NET Framework 4.8 are required. They are normally present on current Windows installations. Official WebView2 download:
@@ -116,3 +116,9 @@ The current line number, row highlight and status position follow that end,
 including backward selections and wrapped rows. These marks do not change
 saved or copied text. Undo, tab changes and window transfers retain direction.
 Help > About should display 2026.10.27-r6.
+
+BUILD 2026.10.28-r1
+Opening Another Note again without file arguments creates a new window with
+one blank tab. Existing windows and drafts stay open. The first launch after
+closing the app still restores its previous session. File arguments continue
+to open in the existing app. Help > About should display 2026.10.28-r1.

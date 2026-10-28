@@ -5,7 +5,7 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 ## Downloads
 
 - **HTML:** open `Another-Note-2026.10.28-r1.html` in your browser.
-- **Windows:** run `Another-Note-Setup-2026.10.27-r6.exe`, or extract `Another-Note-Windows-2026.10.27-r6.zip` and run `Another-Note.exe` inside it.
+- **Windows:** run `Another-Note-Setup-2026.10.28-r1.exe`, or extract `Another-Note-Windows-2026.10.28-r1.zip` and run `Another-Note.exe` inside it.
 - **Fedora:** extract `Another-Note-Fedora-2026.10.28-r1.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
@@ -130,4 +130,4 @@ Selected line breaks have a one-character highlight cell, making selected empty 
 
 Launching the Fedora app again while it is running opens a separate window with one new blank tab. Existing windows and drafts stay open, and the first launch after closing the app still restores the previous session. The installed app icon has a **New Window** action for opening a window on the current GNOME workspace. GNOME can focus an existing window when its running icon is clicked normally; use **New Window** or Ctrl+click the icon to request another window. File launches continue to open their files in the existing app.
 
-The Windows launcher source follows the same repeat-launch behavior for its next build. Windows downloads remain at 2026.10.27-r6 until a new Windows build is requested.
+The Windows installer and portable package are also supplied for this build, including the new-window behavior on repeat launches. Future Windows builds remain on request.
