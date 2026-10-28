@@ -22,7 +22,7 @@ class Window:
     def create_file_dialog(self,*args,**kwargs):return self.dialog
     def destroy(self):self.destroyed=True;self.events.closed.emit()
 class Platform:
-    def __init__(self):self.messages=[];self.point=(100,100);self.root=0;self.ghost=False;self.keys={1:True,27:False};self.positions=[]
+    def __init__(self):self.messages=[];self.point=(100,100);self.root=0;self.ghost=False;self.keys={1:True,27:False};self.positions=[];self.launch_positions=[]
     def appearance(self,editor,theme):self.theme=theme
     def position(self,editor,anchor):self.positions.append(anchor)
     def message(self,text):self.messages.append(text)
@@ -30,6 +30,8 @@ class Platform:
     def handle(self,editor):return id(editor)
     def local_point(self,editor,point):return point
     def cursor(self):return self.point
+    def launch_point(self):return self.point
+    def position_near_pointer(self,editor,point):self.launch_positions.append(point)
     def pressed(self,key):return self.keys.get(key,False)
     def frame(self,editor):return (0,0,1120,790,0,0)
     def create_ghost(self,*args):self.ghost=True
@@ -71,6 +73,29 @@ class WindowsHostTests(unittest.TestCase):
         self.assertEqual(loaded['settings']['openIds'],[]);self.assertIsNone(loaded['activeId']);self.assertEqual([note['content'] for note in loaded['notes']],['draft a','draft b'])
         self.assertEqual(self.app.hub.tabs[self.source.identity],['a']);self.assertFalse(fresh.window.visible)
         fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build});self.assertTrue(fresh.window.visible)
+    def test_launch_position_is_captured_before_loading_and_applied_before_show(self):
+        self.platform.point=(4400,-300);fresh=self.app.new_window(ids=[])
+        self.platform.point=(100,100);fresh.dispatch({'command':'load'});events=[]
+        with patch.object(self.platform,'position_near_pointer',side_effect=lambda editor,point:events.append(('place',point))),patch.object(fresh.window,'show',side_effect=lambda:events.append(('show',))):
+            fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+            fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+        self.assertEqual(events,[('place',(4400,-300)),('show',),('show',)])
+        self.assertIsNone(fresh.launch_point)
+    def test_forwarded_launch_position_is_used_instead_of_the_receivers_pointer(self):
+        fresh=self.app.new_window(ids=[],launch_point=(-2200,500));fresh.dispatch({'command':'load'})
+        fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+        self.assertEqual(self.platform.launch_positions[-1],(-2200,500));self.assertTrue(fresh.window.visible)
+    def test_placement_failure_keeps_the_editor_visible_and_ready(self):
+        fresh=self.app.new_window(ids=[]);fresh.dispatch({'command':'load'})
+        with patch.object(self.platform,'position_near_pointer',side_effect=OSError('Monitor unavailable')),patch.object(self.app,'log') as log:
+            reply=fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+        self.assertEqual(reply,{'ready':True});self.assertTrue(fresh.window.visible);self.assertTrue(fresh.ready.is_set())
+        log.assert_called_once_with('Window placement: Monitor unavailable')
+    def test_pointer_read_failure_keeps_default_window_placement_available(self):
+        with patch.object(self.platform,'launch_point',side_effect=OSError('Mouse unavailable')),patch.object(self.app,'log') as log:
+            fresh=self.app.new_window(ids=[])
+        fresh.dispatch({'command':'load'});fresh.dispatch({'command':'ready','theme':'dark','build':self.app.build})
+        self.assertIsNone(fresh.launch_point);self.assertTrue(fresh.window.visible);log.assert_called_once_with('Launch position: Mouse unavailable')
     def transfer(self,**extra):return dict(fileId='a',transfer={'fileId':'a','cursor':{'start':2,'end':5},'history':{'undo':[{'content':'old'}],'redo':[]}},**extra)
     def test_workspace_and_draft_survive_restart(self):
         loaded=host.NotebookStore(self.app.store.folder).read()['state'];self.assertEqual(loaded['notes'][0]['content'],'draft a');self.assertTrue(self.source.window.visible);self.assertEqual(self.source.dispatch({'command':'load'})['liveDrag'],True)
@@ -153,7 +178,7 @@ class WindowsHostTests(unittest.TestCase):
         def ready(ids,transfer,anchor):
             child=create(ids,transfer,anchor);result=child.dispatch({'command':'load'});self.assertEqual(result['state']['settings']['openIds'],['a']);self.assertEqual(result['transfer']['fileId'],'a');child.dispatch({'command':'ready','theme':'dark','build':self.app.build});return child
         with patch.object(self.app,'new_window',ready):result=self.app.detach(self.source,self.transfer(),{'point':(500,400)})
-        self.assertTrue(result['moved']);self.assertEqual(self.app.hub.tabs[self.source.identity],['a']);self.assertEqual(self.platform.positions,[{'point':(500,400)}])
+        self.assertTrue(result['moved']);self.assertEqual(self.app.hub.tabs[self.source.identity],['a']);self.assertEqual(self.platform.positions,[{'point':(500,400)}]);self.assertEqual(self.platform.launch_positions,[(100,100)],'A detached tab keeps its explicit drop position')
     def test_live_drag_follows_target_and_freezes_on_release(self):
         target=self.target();self.platform.root=id(target);self.platform.keys[1]=False
         data=self.transfer(token='drag',grabRatio=.3);record=dict(source=self.source,data=data,meta={'token':'drag','grabRatio':.3},point=(100,100),target=None,generation=0,ended=False,cancelled=False,offset=(30,16));self.app.drag.current=record;self.platform.ghost=True

@@ -35,8 +35,8 @@ class Bridge:
         except Exception as error:return {'result':None,'error':str(error)}
 
 class Editor:
-    def __init__(self,app,identity,ids=None,transfer=None,anchor=None):
-        self.app=app;self.identity=identity;self.initial_ids=ids;self.transfer=transfer;self.anchor=anchor;self.window=None;self.loaded=False;self.closed=False;self.closing=False;self.can_destroy=False;self.viewport=(1120,790);self.ready=threading.Event();self.failed=None;self.pending_imports=[];self.ui_ready=threading.Event();self.startup_timer=None
+    def __init__(self,app,identity,ids=None,transfer=None,anchor=None,launch_point=None):
+        self.app=app;self.identity=identity;self.initial_ids=ids;self.transfer=transfer;self.anchor=anchor;self.launch_point=launch_point;self.window=None;self.loaded=False;self.closed=False;self.closing=False;self.can_destroy=False;self.viewport=(1120,790);self.ready=threading.Event();self.failed=None;self.pending_imports=[];self.ui_ready=threading.Event();self.startup_timer=None
     def trusted(self):
         if self.closed or self.window is None:return False
         current=self.window.get_current_url()
@@ -90,6 +90,13 @@ class Editor:
     def deliver_imports(self,paths):
         if not self.loaded:self.pending_imports.extend(paths);return
         entries=self.app.read_imports(paths);self.fire('window.vistaNotesOpenDroppedFiles('+json.dumps(entries,ensure_ascii=True)+');')
+    def show_window(self):
+        if self.anchor:self.app.platform.position(self,self.anchor)
+        elif self.launch_point is not None:
+            point=self.launch_point;self.launch_point=None
+            try:self.app.platform.position_near_pointer(self,point)
+            except Exception as error:self.app.log('Window placement: '+str(error))
+        self.window.show()
     def dispatch(self,data):
         command=data.get('command');app=self.app
         if command=='load':
@@ -101,10 +108,9 @@ class Editor:
                 self.failed='The editor page is from a different build. Close all Another Note windows and reinstall build '+app.build+'.'
                 self.ready.set();app.platform.message(self.failed);self.destroy();return {'ready':False}
             if data.get('failed'):
-                self.failed='The editor could not load its workspace.';self.loaded=True;self.window.show();self.ready.set();return {'ready':False}
+                self.failed='The editor could not load its workspace.';self.loaded=True;self.show_window();self.ready.set();return {'ready':False}
             self.loaded=True;app.platform.appearance(self,data.get('theme','dark'))
-            if self.anchor:app.platform.position(self,self.anchor)
-            self.window.show();self.ready.set()
+            self.show_window();self.ready.set()
             if self.pending_imports:paths=self.pending_imports;self.pending_imports=[];threading.Thread(target=self.deliver_imports,args=(paths,),daemon=True).start()
             return {'ready':True}
         if command=='appearance':
@@ -253,9 +259,12 @@ class Application:
             self.folder.mkdir(parents=True,exist_ok=True)
             with (self.folder/'diagnostics.log').open('a',encoding='utf-8') as output:output.write(str(text)+'\n')
         except OSError:pass
-    def new_window(self,ids=None,transfer=None,anchor=None):
+    def new_window(self,ids=None,transfer=None,anchor=None,launch_point=None):
+        if anchor is None and launch_point is None:
+            try:launch_point=self.platform.launch_point()
+            except OSError as error:self.log('Launch position: '+str(error))
         with self.lock:
-            identity='main' if self.window_sequence==0 else 'window-'+uuid.uuid4().hex;self.window_sequence+=1;editor=Editor(self,identity,ids,transfer,anchor);self.editors[identity]=editor
+            identity='main' if self.window_sequence==0 else 'window-'+uuid.uuid4().hex;self.window_sequence+=1;editor=Editor(self,identity,ids,transfer,anchor,launch_point);self.editors[identity]=editor
         try:
             editor.window=self.webview.create_window('Another Note',url=self.uri,js_api=Bridge(editor),width=1120,height=790,min_size=(480,340),hidden=True,background_color='#191e23',text_select=True)
             editor.window.events.closing+=editor.request_close;editor.window.events.closed+=editor.on_closed;editor.window.events.loaded+=editor.on_loaded

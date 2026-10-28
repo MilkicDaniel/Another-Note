@@ -32,11 +32,13 @@ class Instance:
         data=path.read_bytes()
         if len(data)!=32:raise ValueError('The local app connection key is invalid.')
         return data
-    def forward(self,paths):
+    def forward(self,paths,launch_point=None):
         for _ in range(30):
             try:
                 with Client(self.pipe,family='AF_PIPE',authkey=self.key()) as connection:
-                    connection.send_bytes(json.dumps({'protocol':2,'build':self.build,'sha256':self.editor_digest,'paths':paths}).encode())
+                    request={'protocol':2,'build':self.build,'sha256':self.editor_digest,'paths':paths}
+                    if launch_point is not None:request['launchPoint']=launch_point
+                    connection.send_bytes(json.dumps(request).encode())
                     try:
                         if not connection.poll(2):raise EOFError()
                         reply=json.loads(connection.recv_bytes(4096))
@@ -57,7 +59,12 @@ class Instance:
             paths=request.get('paths')
         else:paths=request
         if not isinstance(paths,list) or any(not isinstance(p,str) for p in paths):return
-        editor=app.new_window(ids=[]) if not paths else next((e for e in list(app.editors.values()) if not e.closed),None)
+        point=request.get('launchPoint') if structured else None
+        if point is not None:
+            if not isinstance(point,list) or len(point)!=2 or any(type(v) is not int or not -(2**31)<=v<2**31 for v in point):return
+            point=tuple(point)
+        options={'launch_point':point} if point is not None else {}
+        editor=app.new_window(ids=[],**options) if not paths else next((e for e in list(app.editors.values()) if not e.closed),None)
         if editor:
             if paths:
                 editor.deliver_imports(paths)
@@ -83,11 +90,13 @@ def main():
     if os.name!='nt':raise RuntimeError('Run Another-Note.exe on Windows 10 or 11 (64-bit).')
     platform=WindowsPlatform();instance=None;folder=data_folder()
     try:
+        try:launch_point=platform.launch_point()
+        except OSError:launch_point=None
         instance=Instance(folder,load_release(ROOT))
-        if not instance.primary:instance.forward(sys.argv[1:]);return 0
+        if not instance.primary:instance.forward(sys.argv[1:],launch_point);return 0
         import webview
         webview.settings['ALLOW_FILE_URLS']=True;webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER']=True
-        app=Application(webview,platform,folder);editor=app.new_window();editor.pending_imports=[str(Path(p).expanduser().resolve()) for p in sys.argv[1:]];instance.serve(app)
+        app=Application(webview,platform,folder);editor=app.new_window(launch_point=launch_point);editor.pending_imports=[str(Path(p).expanduser().resolve()) for p in sys.argv[1:]];instance.serve(app)
         webview.start(gui='edgechromium',private_mode=False,storage_path=str(folder/'webview'),icon=str(ROOT/'another-note.ico'),debug=False)
         return 0
     except DifferentBuildRunning as error:

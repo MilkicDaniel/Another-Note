@@ -54,7 +54,7 @@ jobs:
           cat > "$notes" <<EOF
           Windows installer and portable ZIP for Another Note $version.
 
-          Launching Another Note again without file arguments opens a new window with one blank tab. Existing windows and drafts stay open. File arguments still open in the existing app.
+          Launching Another Note again without file arguments opens a new window with one blank tab. New application windows open near the launch pointer on its monitor and stay inside the monitor's work area. Existing windows and drafts stay open. File arguments still open in the existing app.
 
           Close all Another Note windows before updating. Install with Another-Note-Setup-$version.exe, or extract Another-Note-Windows-$version.zip and run Another-Note.exe inside it.
 

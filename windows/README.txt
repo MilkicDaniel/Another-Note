@@ -1,10 +1,10 @@
 Another Note for Windows (64-bit)
 
 INSTALL
-Run Another-Note-Setup-2026.10.28-r1.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
+Run Another-Note-Setup-2026.10.28-r2.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
 
 PORTABLE PACKAGE
-Extract the entire Another-Note-Windows-2026.10.28-r1.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
+Extract the entire Another-Note-Windows-2026.10.28-r2.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
 
 REQUIREMENTS
 Windows 10 or Windows 11, x64. Microsoft Edge WebView2 Runtime and .NET Framework 4.8 are required. They are normally present on current Windows installations. Official WebView2 download:
@@ -122,3 +122,11 @@ Opening Another Note again without file arguments creates a new window with
 one blank tab. Existing windows and drafts stay open. The first launch after
 closing the app still restores its previous session. File arguments continue
 to open in the existing app. Help > About should display 2026.10.28-r1.
+
+BUILD 2026.10.28-r2
+New app windows open near the mouse on the monitor where you launch them,
+including repeat launches. Placement keeps the window inside that monitor's
+usable area and supports monitors left of or above the primary monitor and
+mixed display scaling. The launch position is remembered while the editor
+loads. Moving a detached tab keeps its drop placement. Opening files in an
+existing window does not reposition that window. Help > About shows 2026.10.28-r2.

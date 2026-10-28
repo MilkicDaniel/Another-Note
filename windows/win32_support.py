@@ -3,6 +3,16 @@ import ctypes as C
 from ctypes import wintypes as W
 import os
 
+class MonitorInfo(C.Structure):
+    _fields_=[('size',W.DWORD),('monitor',W.RECT),('work',W.RECT),('flags',W.DWORD)]
+
+def near_pointer_bounds(point,work_area,window_size):
+    """Place a window near a physical pointer, inside that monitor's work area."""
+    left,top,right,bottom=work_area
+    if right<=left or bottom<=top:raise ValueError('The monitor has no usable work area.')
+    width=min(max(1,window_size[0]),right-left);height=min(max(1,window_size[1]),bottom-top)
+    return max(left,min(point[0]+16,right-width)),max(top,min(point[1]+16,bottom-height)),width,height
+
 class WindowsPlatform:
     def __init__(self):
         if os.name != 'nt': raise RuntimeError('This desktop version requires Windows.')
@@ -11,6 +21,10 @@ class WindowsPlatform:
             fn=getattr(lib,name);fn.argtypes=args;fn.restype=result;return fn
         ptr=C.c_void_p
         bind(self.user,'GetCursorPos',[C.POINTER(W.POINT)],W.BOOL)
+        bind(self.user,'GetPhysicalCursorPos',[C.POINTER(W.POINT)],W.BOOL)
+        bind(self.user,'MonitorFromPoint',[W.POINT,W.DWORD],ptr)
+        bind(self.user,'GetMonitorInfoW',[ptr,C.POINTER(MonitorInfo)],W.BOOL)
+        bind(self.user,'SetThreadDpiAwarenessContext',[ptr],ptr)
         bind(self.user,'GetAsyncKeyState',[C.c_int],C.c_short)
         bind(self.user,'WindowFromPoint',[W.POINT],ptr)
         bind(self.user,'GetAncestor',[ptr,W.UINT],ptr)
@@ -51,6 +65,35 @@ class WindowsPlatform:
         p=W.POINT()
         if not self.user.GetCursorPos(C.byref(p)):raise OSError('Could not read mouse position.')
         return p.x,p.y
+    def launch_point(self):
+        # A second launcher has not initialized the GUI or its DPI mode yet.
+        p=W.POINT()
+        if not self.user.GetPhysicalCursorPos(C.byref(p)):raise OSError('Could not read the launch mouse position.')
+        return p.x,p.y
+    def position_near_pointer(self,editor,point):
+        def place():
+            from System.Windows.Forms import FormStartPosition
+            editor.window.native.StartPosition=FormStartPosition.Manual
+            # Use physical pixels consistently even across differently scaled
+            # monitors, then restore the GUI thread's original DPI context.
+            previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(-4))
+            if not previous:previous=self.user.SetThreadDpiAwarenessContext(C.c_void_p(-3))
+            if not previous:raise OSError('Could not select physical window coordinates.')
+            try:
+                monitor=self.user.MonitorFromPoint(W.POINT(*point),2)
+                info=MonitorInfo();info.size=C.sizeof(info)
+                if not monitor or not self.user.GetMonitorInfoW(monitor,C.byref(info)):raise OSError('Could not read the launch monitor.')
+                work=info.work;area=(work.left,work.top,work.right,work.bottom);handle=self.handle(editor)
+                # Moving to a different DPI can change the physical window
+                # size. Read it again there before the final on-screen clamp.
+                for _ in range(2):
+                    rect=W.RECT()
+                    if not self.user.GetWindowRect(handle,C.byref(rect)):raise OSError('Could not read the new window bounds.')
+                    bounds=near_pointer_bounds(point,area,(rect.right-rect.left,rect.bottom-rect.top))
+                    if not self.user.SetWindowPos(handle,None,*bounds,0x14):raise OSError('Could not position the new window.')
+            finally:
+                self.user.SetThreadDpiAwarenessContext(previous)
+        editor.ui(place)
     def pressed(self,key):return bool(self.user.GetAsyncKeyState(key)&0x8000)
     def root_at(self,point):return int(self.user.GetAncestor(self.user.WindowFromPoint(W.POINT(*point)),2) or 0)
     def frame(self,editor):

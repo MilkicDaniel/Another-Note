@@ -22,6 +22,21 @@ class WindowsInstanceTests(unittest.TestCase):
         connection=Connection(reply={'status':'accepted','build':self.instance.build,'sha256':self.instance.editor_digest})
         with patch.object(launcher,'Client',return_value=connection):self.instance.forward(['note.txt'])
         self.assertEqual(connection.sent[0]['protocol'],2);self.assertEqual(connection.sent[0]['paths'],['note.txt']);self.assertEqual(connection.sent[0]['build'],self.instance.build)
+    def test_forwarded_launch_includes_the_physical_pointer_position(self):
+        connection=Connection(reply={'status':'accepted','build':self.instance.build,'sha256':self.instance.editor_digest})
+        with patch.object(launcher,'Client',return_value=connection):self.instance.forward([],(-2200,500))
+        self.assertEqual(connection.sent[0]['launchPoint'],[-2200,500])
+    def test_server_passes_the_launch_pointer_to_the_new_window(self):
+        connection=Connection(request=self.request(launchPoint=[4400,-300]));self.instance.receive(self.app,connection)
+        self.app.new_window.assert_called_once_with(ids=[],launch_point=(4400,-300));self.assertEqual(connection.sent[0]['status'],'accepted')
+    def test_invalid_pointer_coordinates_are_rejected_without_opening_windows(self):
+        for point in ('invalid',[1],[True,1],[1,2,3],[2**40,0],[float('nan'),0]):
+            with self.subTest(point=point):
+                self.instance.receive(self.app,Connection(request=self.request(launchPoint=point)))
+                self.app.new_window.assert_not_called();self.editor.window.show.assert_not_called()
+    def test_file_arguments_do_not_reposition_or_replace_an_existing_window(self):
+        request=self.request(launchPoint=[4400,300]);request['paths']=['file.txt'];self.instance.receive(self.app,Connection(request=request))
+        self.app.new_window.assert_not_called();self.editor.deliver_imports.assert_called_once_with(['file.txt']);self.editor.window.show.assert_called_once()
     def test_an_older_launcher_without_a_handshake_does_not_silently_reopen(self):
         with patch.object(launcher,'Client',return_value=Connection()),self.assertRaisesRegex(launcher.DifferentBuildRunning,'Close all Another Note windows'):
             self.instance.forward([])
