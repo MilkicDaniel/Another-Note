@@ -1,0 +1,28 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {executeJob}=require('./worker_harness.cjs');
+const c=vm.createContext({});vm.runInContext(fs.readFileSync(path.join(__dirname,'../source/symbol-index.js'),'utf8'),c);
+const plain=value=>JSON.parse(JSON.stringify(value));
+const html='<!-- <div class="card" id="main"> -->\n<main id="main" class="card selected"><label for="main">Main</label><a href="#main">Go</a><button onclick="render()">Run</button></main>\n<style>.card:hover { color:#fff; }</style>\n<script>render(); document.getElementById("main");</script>';
+const css='/* .card #main */\n.card, #main { color:#fff; opacity:.5; content:".card"; }\n@media (width>1px) { .card.selected { color:red; } }';
+const js='function render() {}\nconst draw = () => render();\nconst cb = render;\n// render() .card\nconst label = "render card"; const re = /render/g;\ndocument.querySelector(".card#main"); document.querySelectorAll(".card");\ndocument.getElementById("main"); el.classList.add("card", "selected"); el.className="card"; el.setAttribute("id", "main");\nclass Widget {}\nnew Widget();';
+const sources=[{id:'html',title:'index.html',mode:'html',content:html},{id:'css',title:'style.css',mode:'css',content:css},{id:'js',title:'app.js',mode:'javascript',content:js},{id:'text',title:'words.txt',mode:'text',content:'card main render Widget'},{id:'json',title:'data.json',mode:'json',content:'{"card":"main","name":"render"}'}];
+for(const source of sources)for(const item of c.referenceTokens(source.content,source.mode))assert.equal(source.content.slice(item.start,item.end),item.name,'Every reference preserves its exact original range');
+assert.deepEqual(plain(c.referenceTokens(css,'css')).map(item=>[item.kind,item.name]),[['class','card'],['id','main'],['class','card'],['class','selected']],'CSS values, comments and content strings are excluded');
+(async()=>{
+  const refs=async(name,kind,sourceId='html',offset=html.indexOf(name))=>executeJob({op:'references',reference:{name,kind,sourceId,offset},sources});
+  let result=await refs('card','auto','html',html.indexOf('class="card selected"')+8);assert.equal(result.symbol.kind,'class');assert.equal(result.total,8);assert.equal(result.groups.length,3);
+  result=await refs('main','id');assert.equal(result.total,8);for(const item of result.results)assert.equal(item.source.content.slice(item.start,item.end),'main');
+  result=await refs('render','auto','js',js.indexOf('render')+2);assert.equal(result.symbol.kind,'function');assert.equal(result.total,5,'Definitions, calls and callbacks count; comments, regexes and unrelated strings do not');
+  result=await refs('Widget','auto','js',js.indexOf('Widget')+2);assert.equal(result.symbol.kind,'type');assert.equal(result.total,2);
+  result=await refs('draw','auto','js',js.indexOf('draw')+2);assert.equal(result.total,1,'Arrow function definitions can be selected');
+  await assert.rejects(refs('color','auto','css',css.indexOf('color')+2),/Choose a class/);
+  const mixed=[{id:'py',mode:'python',content:'def build():\n  return build()\n# build()\ns="build"'},{id:'java',mode:'java',content:'class Builder { void build() { build(); } } // build()'},{id:'sh',mode:'bash',content:'build() { echo ready; }\nbuild\n# build'}];
+  result=await executeJob({op:'references',reference:{name:'build',kind:'auto',sourceId:'py',offset:5},sources:mixed});assert.equal(result.symbol.kind,'function');assert.equal(result.total,6);
+  const nested='<div\n class = \'card selected\'\n aria-labelledby="main other" onClick="render()"></div><script type="application/json">{"render":"card"}</script>';
+  for(const item of c.referenceTokens(nested,'html'))assert.equal(nested.slice(item.start,item.end),item.name,'Multiline and single-quoted attributes preserve ranges');
+  assert.equal(c.referenceTokens(nested,'html').filter(item=>item.name==='render').length,1);
+  const tricky=[{id:'x',mode:'javascript',content:'const actions={render: () => 1}; const value = `${render()}`; el.querySelector(\'a[href=".render"]\');'},{id:'bash',mode:'bash',content:'build-page() { echo ready; }\nbuild-page'}];
+  result=await executeJob({op:'references',reference:{name:'render',kind:'auto',sourceId:'x',offset:tricky[0].content.indexOf('render')},sources:tricky});assert.equal(result.total,2,'Object arrow functions and template expressions are references; quoted selector attribute content is not a class');
+  result=await executeJob({op:'references',reference:{name:'build-page',kind:'auto',sourceId:'bash',offset:2},sources:tricky});assert.equal(result.total,2,'Bash function names can contain hyphens');
+  console.log('PASS: background class/ID/function references across open source snapshots, exact locations, HTML/CSS/selector APIs, callback and arrow functions, embedded code, comments/strings/regex exclusions and Python/Java/Bash');
+})().catch(error=>{console.error(error);process.exitCode=1;});

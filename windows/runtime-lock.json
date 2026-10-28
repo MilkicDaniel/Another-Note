@@ -1,0 +1,65 @@
+{
+  "python": {
+    "version": "3.13.12",
+    "url": "https://www.python.org/ftp/python/3.13.12/python-3.13.12-embed-amd64.zip",
+    "sha256": "76f238f606250c87c6beac75dccd35ee99070a13490555936abb6cb64ecce3d0"
+  },
+  "wheels": [
+    {
+      "name": "bottle",
+      "version": "0.13.4",
+      "filename": "bottle-0.13.4-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/83/f6/b55ec74cfe68c6584163faa311503c20b0da4c09883a41e8e00d6726c954/bottle-0.13.4-py2.py3-none-any.whl",
+      "sha256": "045684fbd2764eac9cdeb824861d1551d113e8b683d8d26e296898d3dd99a12e"
+    },
+    {
+      "name": "cffi",
+      "version": "2.0.0",
+      "filename": "cffi-2.0.0-cp313-cp313-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/37/18/6519e1ee6f5a1e579e04b9ddb6f1676c17368a7aba48299c3759bbc3c8b3/cffi-2.0.0-cp313-cp313-win_amd64.whl",
+      "sha256": "19f705ada2530c1167abacb171925dd886168931e0a7b78f5bffcae5c6b5be75"
+    },
+    {
+      "name": "clr_loader",
+      "version": "0.3.1",
+      "filename": "clr_loader-0.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5e/da/ec1a6e36624000b6df0dd61183c42342ee5814c073315e802cadaad04d2f/clr_loader-0.3.1-py3-none-any.whl",
+      "sha256": "cbad189de20d202a7d621956b0fc38049e13c9bf7ca2923441eff725cd121aa1"
+    },
+    {
+      "name": "proxy_tools",
+      "version": "0.1.0",
+      "filename": "proxy_tools-0.1.0-py3-none-any.whl",
+      "url": null,
+      "sha256": "cb7d230da28137f24018a1c1617bdf1adec610424aa5e52b70a00b12a8853d9d"
+    },
+    {
+      "name": "pycparser",
+      "version": "2.23",
+      "filename": "pycparser-2.23-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a0/e3/59cd50310fc9b59512193629e1984c1f95e5c8ae6e5d8c69532ccc65a7fe/pycparser-2.23-py3-none-any.whl",
+      "sha256": "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934"
+    },
+    {
+      "name": "pythonnet",
+      "version": "3.2.1",
+      "filename": "pythonnet-3.2.1-cp311.cp312.cp313.cp314.cp315-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d8/dc/c96a542079a69d3d091e91808fc8aaf9a0d5e2f8e73a63560e4379134bb6/pythonnet-3.2.1-cp311.cp312.cp313.cp314.cp315-none-any.whl",
+      "sha256": "dd5668b74b0c903d9a24e1ba86f728fc490f8e919d56b3c24bf06739b9ee2b7f"
+    },
+    {
+      "name": "pywebview",
+      "version": "6.2.1",
+      "filename": "pywebview-6.2.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3d/25/9491695c22c4842c5b3903b4dc172e0eecf67a27c0af34a71512c9b76a0a/pywebview-6.2.1-py3-none-any.whl",
+      "sha256": "9d07275f53894ab4d5e2e0e996227193e7187dec276d9b624dccbce029216b46"
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.15.0",
+      "filename": "typing_extensions-4.15.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl",
+      "sha256": "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548"
+    }
+  ]
+}

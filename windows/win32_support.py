@@ -1,0 +1,105 @@
+"""Small Windows adapter: pointer state, hit testing, tab image and window chrome."""
+import ctypes as C
+from ctypes import wintypes as W
+import os
+
+class WindowsPlatform:
+    def __init__(self):
+        if os.name != 'nt': raise RuntimeError('This desktop version requires Windows.')
+        self.user=C.WinDLL('user32',use_last_error=True);self.gdi=C.WinDLL('gdi32',use_last_error=True);self.kernel=C.WinDLL('kernel32',use_last_error=True)
+        def bind(lib,name,args,result):
+            fn=getattr(lib,name);fn.argtypes=args;fn.restype=result;return fn
+        ptr=C.c_void_p
+        bind(self.user,'GetCursorPos',[C.POINTER(W.POINT)],W.BOOL)
+        bind(self.user,'GetAsyncKeyState',[C.c_int],C.c_short)
+        bind(self.user,'WindowFromPoint',[W.POINT],ptr)
+        bind(self.user,'GetAncestor',[ptr,W.UINT],ptr)
+        bind(self.user,'GetClientRect',[ptr,C.POINTER(W.RECT)],W.BOOL)
+        bind(self.user,'GetWindowRect',[ptr,C.POINTER(W.RECT)],W.BOOL)
+        bind(self.user,'ClientToScreen',[ptr,C.POINTER(W.POINT)],W.BOOL)
+        bind(self.user,'SetWindowPos',[ptr,ptr,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT],W.BOOL)
+        bind(self.user,'DestroyWindow',[ptr],W.BOOL)
+        bind(self.user,'ShowWindow',[ptr,C.c_int],W.BOOL)
+        bind(self.user,'InvalidateRect',[ptr,ptr,W.BOOL],W.BOOL)
+        bind(self.user,'DefWindowProcW',[ptr,W.UINT,C.c_size_t,C.c_ssize_t],C.c_ssize_t)
+        bind(self.user,'CreateWindowExW',[W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,ptr,ptr,ptr,ptr],ptr)
+        bind(self.kernel,'GetModuleHandleW',[W.LPCWSTR],ptr)
+        bind(self.user,'MessageBoxW',[ptr,W.LPCWSTR,W.LPCWSTR,W.UINT],C.c_int)
+        bind(self.gdi,'CreateSolidBrush',[W.DWORD],ptr)
+        bind(self.gdi,'DeleteObject',[ptr],W.BOOL)
+        bind(self.gdi,'SetTextColor',[ptr,W.DWORD],W.DWORD)
+        bind(self.gdi,'SetBkMode',[ptr,C.c_int],C.c_int)
+        bind(self.gdi,'GetStockObject',[C.c_int],ptr)
+        bind(self.gdi,'SelectObject',[ptr,ptr],ptr)
+        bind(self.user,'FillRect',[ptr,C.POINTER(W.RECT),ptr],C.c_int)
+        bind(self.user,'DrawTextW',[ptr,W.LPCWSTR,C.c_int,C.POINTER(W.RECT),W.UINT],C.c_int)
+        class PAINT(C.Structure):
+            _fields_=[('hdc',ptr),('erase',W.BOOL),('rect',W.RECT),('restore',W.BOOL),('inc',W.BOOL),('reserved',C.c_byte*32)]
+        self.Paint=PAINT
+        bind(self.user,'BeginPaint',[ptr,C.POINTER(PAINT)],ptr);bind(self.user,'EndPaint',[ptr,C.POINTER(PAINT)],W.BOOL)
+        self.callback=C.WINFUNCTYPE(C.c_ssize_t,ptr,W.UINT,C.c_size_t,C.c_ssize_t)(self._wndproc)
+        class CLASS(C.Structure):
+            _fields_=[('style',W.UINT),('proc',ptr),('class_extra',C.c_int),('window_extra',C.c_int),('instance',ptr),('icon',ptr),('cursor',ptr),('brush',ptr),('menu',W.LPCWSTR),('name',W.LPCWSTR)]
+        self.instance=self.kernel.GetModuleHandleW(None)
+        cls=CLASS();cls.proc=C.cast(self.callback,ptr);cls.instance=self.instance;cls.name='AnotherNoteHeldTab'
+        bind(self.user,'RegisterClassW',[C.POINTER(CLASS)],W.WORD)(C.byref(cls))
+        self.ghost_meta={};self.ghost=0
+
+    @staticmethod
+    def handle(editor):return int(editor.window.native.Handle.ToInt64())
+    def cursor(self):
+        p=W.POINT()
+        if not self.user.GetCursorPos(C.byref(p)):raise OSError('Could not read mouse position.')
+        return p.x,p.y
+    def pressed(self,key):return bool(self.user.GetAsyncKeyState(key)&0x8000)
+    def root_at(self,point):return int(self.user.GetAncestor(self.user.WindowFromPoint(W.POINT(*point)),2) or 0)
+    def frame(self,editor):
+        handle=self.handle(editor);rect=W.RECT();outer=W.RECT();origin=W.POINT(0,0)
+        if not self.user.GetClientRect(handle,C.byref(rect)) or not self.user.GetWindowRect(handle,C.byref(outer)) or not self.user.ClientToScreen(handle,C.byref(origin)):raise OSError('The window is unavailable.')
+        return origin.x,origin.y,max(1,rect.right-rect.left),max(1,rect.bottom-rect.top),outer.left,outer.top
+    def local_point(self,editor,point):
+        x,y,w,h,_,_=self.frame(editor);vw,vh=editor.viewport
+        return (point[0]-x)*vw/w,(point[1]-y)*vh/h
+    def position(self,editor,anchor):
+        x,y,w,h,left,top=self.frame(editor);vw,vh=editor.viewport;scale_x,scale_y=w/max(1,vw),h/max(1,vh)
+        px,py=anchor['point'];new_x=round(px-(x-left)-(anchor.get('tabX',50)+anchor.get('offsetX',30))*scale_x);new_y=round(py-(y-top)-(anchor.get('tabY',33)+anchor.get('offsetY',16))*scale_y)
+        self.user.SetWindowPos(self.handle(editor),None,new_x,new_y,0,0,0x15)
+    def appearance(self,editor,theme):
+        def apply():
+            from System.Drawing import Color
+            color=Color.FromArgb(*( (25,30,35) if theme=='dark' else (252,252,252) ))
+            editor.window.native.BackColor=color;editor.window.native.webview.DefaultBackgroundColor=color
+            try:
+                dark=C.c_int(theme=='dark');dwm=C.WinDLL('dwmapi');dwm.DwmSetWindowAttribute.argtypes=[C.c_void_p,W.DWORD,C.c_void_p,W.DWORD];dwm.DwmSetWindowAttribute(self.handle(editor),20,C.byref(dark),C.sizeof(dark))
+            except (AttributeError,OSError):pass
+        editor.ui(apply)
+    def create_ghost(self,editor,meta,width,height):
+        def create():
+            self.ghost_meta=meta
+            self.ghost=self.user.CreateWindowExW(0x08000000|0x00000080|0x00000020|0x00000008,'AnotherNoteHeldTab','',0x80000000|0x08000000,0,0,width,height,None,None,self.instance,None)
+            if not self.ghost:raise OSError('Could not create the dragged tab image.')
+            # The first motion positions the image before revealing it.
+            self.ghost_visible=False
+        editor.ui(create)
+    def move_ghost(self,point,offset,visible=True):
+        if self.ghost:
+            self.user.SetWindowPos(self.ghost,C.c_void_p(-1),round(point[0]-offset[0]),round(point[1]-offset[1]),0,0,0x11)
+            if visible!=self.ghost_visible:self.user.ShowWindow(self.ghost,4 if visible else 0);self.ghost_visible=visible
+    def close_ghost(self,editor):
+        def destroy():
+            if self.ghost:self.user.DestroyWindow(self.ghost);self.ghost=0
+        if self.ghost:
+            owner=editor if not editor.closed else next((e for e in editor.app.editors.values() if not e.closed),None)
+            if owner:owner.ui(destroy)
+    def message(self,text):self.user.MessageBoxW(None,str(text),'Another Note',0x10)
+    def open_image(self,path):
+        import os
+        os.startfile(str(path))
+    def _wndproc(self,handle,message,wparam,lparam):
+        if message==0x84:return -1
+        if message==0x0f:
+            paint=self.Paint();dc=self.user.BeginPaint(handle,C.byref(paint));rect=W.RECT();self.user.GetClientRect(handle,C.byref(rect));light=self.ghost_meta.get('theme')=='light';background=0xfcfcfc if light else 0x463d34;foreground=0x201810 if light else 0xefe8e1
+            brush=self.gdi.CreateSolidBrush(background);self.user.FillRect(dc,C.byref(rect),brush);self.gdi.DeleteObject(brush);self.gdi.SetBkMode(dc,1);self.gdi.SetTextColor(dc,foreground);old=self.gdi.SelectObject(dc,self.gdi.GetStockObject(17));rect.left+=12;rect.right-=30
+            title=str(self.ghost_meta.get('title') or 'untitled')+('  ●' if self.ghost_meta.get('modified') else '')
+            self.user.DrawTextW(dc,title,-1,C.byref(rect),0x20|4|0x8000|0x800);rect.left=rect.right+6;rect.right+=24;self.user.DrawTextW(dc,'×',-1,C.byref(rect),0x20|4|1);self.gdi.SelectObject(dc,old);self.user.EndPaint(handle,C.byref(paint));return 0
+        return self.user.DefWindowProcW(handle,message,wparam,lparam)

@@ -1,0 +1,4 @@
+# Preserve generated upstream code and license text verbatim.
+source/vendor/* -whitespace
+fedora/THIRD_PARTY_LICENSES.txt -whitespace
+windows/vendor/* -whitespace

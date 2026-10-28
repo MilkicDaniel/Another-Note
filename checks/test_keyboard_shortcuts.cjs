@@ -1,0 +1,18 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{open:false,hidden:true,innerHTML:'',textContent:'',addEventListener(){},contains(){return false;},showModal(){this.open=true;},querySelector(){return null;}});return nodes.get(id);};
+const calls=[],editor={readOnly:false},state={settings:{}},c=vm.createContext({state,editor,document:{activeElement:editor,querySelectorAll:()=>[]},$:node,ready:true,composing:false,activityBlocked:()=>false,closeMenus(){},clock:()=>123,save:()=>calls.push('save'),escape:String,toast:message=>calls.push(message),actions:new Proxy({},{get:(_,id)=>()=>calls.push(id)}),stepFindAllResult:step=>calls.push(['result',step]),findMatches:(advance,backwards)=>calls.push(['inline',backwards]),openFindAllResult:()=>calls.push('openResult'),indentLines:out=>calls.push(['indent',out])});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../source/keyboard-shortcuts.js'),'utf8'),c);
+const event=(key,options={})=>({key,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;},...options});
+let e=event('s',{ctrlKey:true});c.dispatchKeyboardShortcut(e);assert.ok(e.prevented&&e.stopped);assert.equal(calls.at(-1),'export');
+assert.ok(c.setShortcutBinding('export',['Ctrl+Alt+S']));assert.equal(state.settings.shortcutsUpdatedAt,123);assert.equal(c.shortcutText('export'),'Ctrl + Alt + S');
+e=event('s',{ctrlKey:true});const count=calls.length;c.dispatchKeyboardShortcut(e);assert.ok(e.prevented);assert.equal(calls.length,count,'Old Save chord cannot open the browser Save Page dialog');
+e=event('s',{ctrlKey:true,altKey:true});c.dispatchKeyboardShortcut(e);assert.equal(calls.at(-1),'export');
+assert.equal(c.setShortcutBinding('new',['Ctrl+Alt+S']),false);assert.match(node('shortcutMessage').textContent,/Save file/);assert.equal(c.configuredShortcuts('new')[0],'Ctrl+N');
+assert.ok(c.setShortcutBinding('export',[]));assert.equal(c.configuredShortcuts('export').length,0);assert.ok(c.setShortcutBinding('new',['Ctrl+Alt+S']));
+c.document.activeElement={};e=event('Tab');c.dispatchKeyboardShortcut(e);assert.equal(e.prevented,undefined,'Tab still moves focus outside the code editor');
+c.document.activeElement=editor;e=event('Tab',{shiftKey:true});c.dispatchKeyboardShortcut(e);assert.deepEqual(calls.at(-1),['indent',true]);
+node('findAllPanel').hidden=false;c.dispatchKeyboardShortcut(event('F3'));assert.deepEqual(calls.at(-1),['result',1]);c.dispatchKeyboardShortcut(event('F3',{shiftKey:true}));assert.deepEqual(calls.at(-1),['result',-1]);
+assert.equal(c.normalizeShortcut('A'),null);assert.equal(c.normalizeShortcut('Ctrl+Ctrl+A'),null);assert.equal(c.normalizeShortcut('Alt+Ctrl+A'),'Ctrl+Alt+A');assert.equal(c.eventShortcut(event('s',{ctrlKey:true,isComposing:true})),null);
+assert.ok(c.shortcutMatchesEvent('fold',event('{',{ctrlKey:true,shiftKey:true,code:'BracketLeft'})));assert.ok(c.shortcutMatchesEvent('zoomIn',event('+',{ctrlKey:true,shiftKey:true})));
+c.showKeyboardShortcuts();assert.ok(node('shortcutsDialog').open);assert.match(node('shortcutList').innerHTML,/data-record-shortcut="format"/);assert.equal(node('helpDialog').open,false,'Shortcuts and About open separate dialogs');
+console.log('Passed: editable app shortcuts, conflicts, clearing, persistent settings, source-editor scopes, key normalization, zoom/fold aliases, search navigation and separate Help dialogs.');

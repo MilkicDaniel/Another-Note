@@ -1,0 +1,13 @@
+/* Search fields grow with actual line breaks and wrapped text. Keep the editor
+   reachable for large blocks by scrolling inside a viewport-bounded field. */
+.find-row{align-items:flex-start}
+.find-row>svg,.find-row-spacer{margin-top:7px}
+.find-row>button{min-height:28px}
+.find-row>textarea,.find-all-search>textarea{flex:1;min-width:40px;height:28px;min-height:28px;max-height:min(200px,25vh);margin:0;padding:4px 8px;resize:none;overflow-x:hidden;overflow-y:auto;background:var(--paper);border:1px solid var(--line-soft);border-radius:5px;font-size:12px;line-height:18px;outline:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.find-row>textarea:focus,.find-all-search>textarea:focus{border-color:var(--accent)}
+.find-row>textarea[aria-invalid=true],.find-all-search>textarea[aria-invalid=true]{border-color:var(--danger)}
+.find-multiline-hint{color:var(--muted);font-size:10px;white-space:nowrap}
+.find-all-search{align-items:flex-start}
+.find-all-search>textarea{min-width:90px;max-height:min(140px,20vh);padding:4px 7px;font-size:11px}
+.find-all-search label:not(.sr-only){min-height:28px}
+@media(max-width:560px){.find-all-search>textarea{flex-basis:120px}}

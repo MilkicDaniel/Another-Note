@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@wasm-fmt/ruff_fmt": "0.15.20",
+    "dictionary-en": "4.0.0",
+    "dictionary-en-gb": "3.0.0",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.2",
+    "nspell": "2.1.5",
+    "prettier": "3.9.10",
+    "prettier-plugin-java": "2.11.0",
+    "sh-syntax": "0.7.0"
+  }
+}

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+artifacts/
+dist/
+fedora/Another-Note.html
+fedora/spelling-worker.js.gz
+fedora/format-worker.js.gz

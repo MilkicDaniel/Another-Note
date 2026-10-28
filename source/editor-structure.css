@@ -1,0 +1,17 @@
+/* Selection is painted with the syntax text, using the same glyph geometry. */
+#editor::selection{background:transparent}
+#highlight .editor-selection{color:inherit;background:#6494b54d;outline:0;border:0;border-radius:0;padding:0;box-shadow:0 2px #6494b54d,0 -2px #6494b54d;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+#highlight .editor-selection-newline{position:relative}
+#highlight .editor-selection-newline::after{content:'';position:absolute;left:0;top:0;bottom:0;width:1ch;background:#6494b54d;box-shadow:0 2px #6494b54d,0 -2px #6494b54d}
+#highlight .editor-selection-caret{position:relative;color:inherit;background:none;border:0;outline:0;padding:0;box-shadow:none}
+#highlight .editor-selection-caret::after{content:'';position:absolute;left:-2px;top:-2px;bottom:-2px;width:5px;border-top:1px solid var(--text);border-bottom:1px solid var(--text);background:linear-gradient(var(--text),var(--text)) center/1px 100% no-repeat}
+#highlight .tag-pair{color:inherit;background:none;border:0;outline:0;padding:0;text-decoration:underline dotted var(--key);text-decoration-thickness:1px;text-underline-offset:4px}
+.fold-gutter{position:relative;flex:0 0 26px;width:26px;overflow:hidden;background:var(--paper);user-select:none}
+#foldControls{position:absolute;top:9px;left:0;right:0;will-change:transform;opacity:0;transition:opacity 240ms ease-in-out}
+.fold-gutter.controls-visible #foldControls,.fold-gutter:focus-within #foldControls{opacity:1}
+.fold-toggle{position:absolute;left:0;width:26px;padding:0;border:0;border-radius:4px;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.fold-toggle svg{width:16px;height:16px;max-height:calc(var(--editor-line) - 2px);fill:currentColor;stroke:none}
+.fold-toggle:hover,.fold-toggle:focus-visible{background:var(--selected);color:var(--accent)}
+.fold-toggle.folded{color:var(--accent);background:var(--selected)}
+@media print{.fold-gutter{display:none!important}}
+@media(prefers-reduced-motion:reduce){#foldControls{transition:none}}
