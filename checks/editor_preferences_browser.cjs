@@ -13,15 +13,16 @@ const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',se
   const shot=async name=>{if(output){fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,`Another-Note-${name}-${version}.png`)});}};
   const open=async()=>{await page.getByRole('button',{name:'Preferences',exact:true}).click();await page.getByRole('button',{name:'Editor Appearance & Formatting…',exact:true}).click();await page.locator('#editorPreferencesDialog').waitFor({state:'visible'});};
   const text=()=>page.locator('#editor').inputValue();
+  const tab=name=>page.getByRole('tab',{name,exact:true}).click();
   const apply=async()=>{await page.locator('#preferencesApply').click();await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});};
   try{
     await page.goto(pathToFileURL(path.join(root,'dist/Another-Note.html')).href);await page.waitForFunction(()=>document.getElementById('editor').value.includes('Original draft'));
-    await open();await page.locator('#preferencesFontStyle').selectOption('italic');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');
+    await open();await tab('Font');await page.locator('#preferencesFontStyle').selectOption('italic');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');
     assert.equal(await page.locator('#preferencesPreview .tok-keyword').first().evaluate(el=>getComputedStyle(el).color),'rgb(255, 136, 68)');
     assert.equal(await page.locator('#editor').evaluate(el=>getComputedStyle(el).fontStyle),'normal');assert.equal(await text(),original);
     await page.keyboard.press('Escape');await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});assert.equal(await text(),original);
     await open();assert.equal(await page.locator('#preferencesFontStyle').inputValue(),'regular','Cancel restores the saved preferences');
-    await page.locator('#preferencesFontFamily').fill('DejaVu Sans Mono');await page.locator('#preferencesFontStyle').selectOption('bold-italic');await page.locator('#preferencesFontSize').fill('18');await page.locator('#preferencesLineHeight').fill('1.8');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');await shot('preferences-dark');
+    await tab('Font');await page.locator('#preferencesFontFamily').fill('DejaVu Sans Mono');await page.locator('#preferencesFontStyle').selectOption('bold-italic');await page.locator('#preferencesFontSize').fill('18');await page.locator('#preferencesLineHeight').fill('1.8');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');await shot('preferences-dark');
     await page.locator('#preferencesPalette').selectOption('light');await page.locator('[data-syntax-hex="keyword"]').fill('#0f659f');await shot('preferences-light');
     await page.locator('#preferencesPalette').selectOption('dark');await page.getByRole('tab',{name:'Formatting',exact:true}).click();
     await page.locator('#preferencesLanguage').selectOption('javascript');
@@ -41,7 +42,7 @@ const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',se
     await page.reload();await page.waitForFunction(()=>getComputedStyle(document.getElementById('editor')).fontStyle==='italic');assert.equal(await text(),original);
     await page.getByRole('button',{name:'Preferences',exact:true}).click();await page.getByRole('menuitemradio',{name:'Light',exact:true}).click();
     assert.equal(await page.locator('#highlight .tok-keyword').first().evaluate(el=>getComputedStyle(el).color),'rgb(15, 101, 159)','Each app theme uses its own saved syntax palette');
-    await open();await page.locator('#preferencesFontFamily').fill('Arial');await apply();
+    await open();await tab('Font');await page.locator('#preferencesFontFamily').fill('Arial');await apply();
     assert.equal(await page.locator('#editor').evaluate(el=>getComputedStyle(el).font),await page.locator('.line-measure').evaluate(el=>getComputedStyle(el).font),'Proportional font metrics also match the text/caret mirror');
     await page.setViewportSize({width:540,height:780});await open();const bounds=await page.locator('#editorPreferencesDialog').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=541&&bounds.y>=0&&bounds.y+bounds.height<=781);
     assert.ok(await page.locator('#preferencesApply').isVisible());await shot('preferences-narrow');await page.keyboard.press('Escape');

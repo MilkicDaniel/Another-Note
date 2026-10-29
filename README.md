@@ -174,11 +174,11 @@ The main editor keeps portable Markdown, HTML, CSV or TSV source; use the table 
 
 ## Build 2026.10.28-r7
 
-**Preferences → Editor Appearance & Formatting… → Appearance** has separate **Dark mode theme** and **Light mode theme** choices. **Follow System** switches between those saved choices automatically. Each preset includes editor, syntax, menu, tab and status colors, with a preview before Apply.
+**Preferences → Editor Appearance & Formatting… → Themes** has separate **Dark mode theme** and **Light mode theme** choices. **Follow System** switches between those saved choices automatically. Each preset includes editor, syntax, menu, tab and status colors, with a preview before Apply.
 
 Dark presets: Dracula, Eva Dark, Panda Syntax, Nord, One Monokai, Atom One Dark, Field Lights, ReUI, Visual Studio 2017 Dark (C/C++), and GitHub Dark. Light presets: PowerShell ISE, Atom One Light, Bluloco Light, Grey Light+ Pro, GitHub (Thomas Pink), and Quiet Light for VSC. Another Note's original light and dark themes remain available. The presets adapt the linked VS Code palettes to Another Note's syntax categories and interface; extension features and language-specific scope distinctions are not imported.
 
-Choose **Customize / preview** to edit either mode's syntax and interface colors. Enter a name and use **Save as New Theme** to add it to **My themes**. Saved themes can be selected, updated, renamed with **Update saved theme**, or deleted. **Apply** saves both choices and the theme library locally; Cancel discards the preview. **Restore defaults** keeps My themes. Font and formatting preferences remain separate. Existing custom colors are retained when updating the app.
+Use the mode menu above the preview to view and edit either mode, then change colors on the **Colors** tab. Enter a name on the **Themes** tab and use **Save as New Theme** to add it to **My themes**. Saved themes can be selected, updated, renamed with **Update Saved Theme**, or deleted. **Apply** saves both choices and the theme library locally; Cancel discards the preview. **Restore defaults** keeps My themes. Font and formatting preferences remain separate. Existing custom colors are retained when updating the app.
 
 All themes work offline, persist through restart and use the existing preference synchronization between windows. Theme changes retain source and clipboard text, selection direction, folds and undo history. Theme source versions, palette checksums, mapping code and license notices are included; see [theme sources](tooling/theme-vendor/README.md). HTML and Fedora downloads are provided. Windows builds remain on request. Native GTK and Windows visual testing was not performed for this build.
 
@@ -257,3 +257,17 @@ Click a column heading to select that column, or click a cell and Shift-click an
 Right-click inside the note for Undo, Redo, Cut, Copy, Paste, Select All and **Add Table…**. Table cells also offer column selection and column/table copying. Shift+F10 opens the same menu from the keyboard. **Add Table** inserts a new table without replacing the table under the pointer. Clipboard failures and changes made while a paste is pending never discard edits or paste into another tab.
 
 This build is local; the public download links above still point to the published r6 release. Browser checks cover the main table view, source switching, columns, right-click actions, exact saved text, unchanged custom fonts, undo, small windows, clipboard failures and paste races. Desktop bridge checks use isolated browser/mocked host fixtures; these do not constitute native Windows or GTK visual testing.
+
+## Build 2026.10.29-r9 (local)
+
+**Preferences → Editor Appearance & Formatting…** now has four tabs: **Themes**, **Colors**, **Font** and **Formatting**. The tabs use a plain underline for the selected tab instead of a boxed outline.
+
+The preview is a small copy of the app: menu bar, tabs, editor with line numbers, current line, text selection, text cursor and search matches, a panel with input, button, link, selected/hover items, code block, success and error text, and the status bar. Syntax colors the chosen sample language does not use appear in an **Other files** row, so every color setting is visible. The preview updates while you type or drag.
+
+Click any part of the preview to open the **Colors** tab at that setting. Its row is highlighted, scrolled into view and opened in the color picker, and the matching preview parts are outlined. Hover the preview to see which setting a part uses. Click near a border to edit **Borders** or **Subtle borders**.
+
+Colors are grouped as Syntax, Markdown, Editor, Tabs, Menu & status bars, Panels & controls, and Text & accents. Each row has a swatch and a HEX field. The swatch opens an in-app picker with a saturation/brightness area, hue slider, colors from the current theme, **Revert**, and keyboard control. This replaces the platform color dialog, which did not work reliably in the Fedora app. Escape closes the picker without closing Preferences.
+
+Three new colors are available: **Text cursor**, **Search matches** and **Inactive tab text**. Existing themes and saved colors derive them from the editor text, the default search highlight and secondary text, so current themes remain unchanged and are not marked as modified.
+
+All 43 JavaScript suites and 212 Python tests pass. `node checks/editor_theme_preview_browser.cjs` verifies that every color appears in the preview. It also checks click-to-edit for text, marks, borders and interface parts; live picker changes; revert, swatch and keyboard use; the new colors after Apply; and narrow layouts. The existing theme, preferences and startup browser checks also pass. These checks ran in Chromium. The Fedora GTK/WebKit window (WebKitGTK 6.0 2.54) was also tested with real mouse and keyboard input through XWayland, using a temporary notebook. That test covered the picker area, hue slider, theme swatches, Escape, clicking preview parts, typed HEX values, the Font tab, Apply and the underline-only tab focus. Rerun it with `python3 checks/editor_theme_preview_gtk.py` after `python3 build.py`. It opens a visible window, needs `xdotool`, and saves snapshots when `QA_SCREENSHOTS` is set. Windows visual testing was not performed.

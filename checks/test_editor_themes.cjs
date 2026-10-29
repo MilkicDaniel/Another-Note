@@ -8,17 +8,18 @@ assert.equal(catalog.filter(t=>t.mode==='dark').length,10);assert.equal(catalog.
 for(const theme of catalog){
   assert.match(theme.sha256,/^[\da-f]{64}$/);assert.ok(theme.packageUrl.includes('/'+theme.version+'/'));
   assert.deepEqual(Object.keys(theme.colors).sort(),plain(style.tokens.map(([key])=>key)).sort());
-  assert.deepEqual(Object.keys(theme.surfaces).sort(),plain(style.surfaceTokens.map(([key])=>key)).sort());
+  assert.deepEqual(Object.keys(theme.surfaces).sort(),plain(style.surfaceTokens.map(([key])=>key)).filter(key=>!["caret","find-match","tab-text"].includes(key)).sort(),"Imported palettes keep their source surfaces; newer interface colors are derived");
   for(const value of [...Object.values(theme.colors),...Object.values(theme.surfaces)])assert.match(value,/^#[\da-f]{6}$/);
   const applied=style.useTheme({},theme.mode,theme.id);
   assert.equal(style.selectedTheme(applied,theme.mode).id,theme.id);
   assert.deepEqual(plain(applied.appearance.colors[theme.mode]),theme.colors);
-  assert.deepEqual(plain(applied.appearance.surfaces[theme.mode]),theme.surfaces);
+  assert.deepEqual(plain(applied.appearance.surfaces[theme.mode]),{...theme.surfaces,caret:theme.colors.text,'find-match':style.surfaces[theme.mode]['find-match'],'tab-text':theme.surfaces.muted});
 }
 let preferences=style.useTheme({},'dark','dracula');preferences=style.useTheme(preferences,'light','atom-one-light');
 assert.equal(preferences.appearance.surfaces.dark.paper,'#282a36');assert.equal(preferences.appearance.colors.dark.keyword,'#ff79c6');
 assert.equal(preferences.appearance.surfaces.light.paper,'#fafafa');assert.equal(preferences.appearance.colors.light.keyword,'#a626a4');
 assert.equal(style.useTheme(preferences,'light','dracula').appearance.selectedThemes.light,'atom-one-light','Choosing an incompatible preset preserves the existing choice');
+assert.equal(style.normalize({appearance:{surfaces:{dark:{...style.surfaces.dark,caret:undefined,'find-match':undefined,'tab-text':undefined}}}}).appearance.selectedThemes.dark,'default-dark','Workspaces saved before the newer interface colors keep the default theme');
 const legacy=style.normalize({appearance:{colors:{dark:{keyword:'#123456'}},fontFamily:'Consolas'}});
 assert.equal(legacy.appearance.colors.dark.keyword,'#123456');assert.equal(legacy.appearance.selectedThemes.dark,'custom','Old custom colors are retained during migration');
 assert.equal(legacy.appearance.selectedThemes.light,'default-light');assert.equal(legacy.appearance.fontFamily,'Consolas');

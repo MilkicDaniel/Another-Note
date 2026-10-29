@@ -160,28 +160,35 @@
   <dialog id="editorPreferencesDialog" aria-labelledby="editorPreferencesTitle" aria-describedby="editorPreferencesDescription">
     <form id="editorPreferencesForm">
       <div class="dialog-heading preferences-heading"><h2 id="editorPreferencesTitle">Editor Appearance &amp; Formatting</h2><button type="button" id="preferencesClose" class="icon-button" aria-label="Cancel editor preferences">×</button></div>
-      <p id="editorPreferencesDescription" class="preferences-intro">Preview your style, then Apply. Formatting rules are used by Format File; changing these preferences keeps your file text intact.</p>
+      <p id="editorPreferencesDescription" class="preferences-intro">Changes show in the preview as you make them; click any part of the preview to edit its color. Apply keeps them. Formatting rules are used by Format File and never change your file text by themselves.</p>
       <div id="preferencesTabs" class="preferences-tabs" role="tablist" aria-label="Editor preferences">
-        <button type="button" id="preferencesAppearanceTab" role="tab" aria-selected="true" aria-controls="preferencesAppearance" data-preferences-section="appearance">Appearance</button>
+        <button type="button" id="preferencesThemesTab" role="tab" aria-selected="true" aria-controls="preferencesThemes" data-preferences-section="themes">Themes</button>
+        <button type="button" id="preferencesColorsTab" role="tab" aria-selected="false" aria-controls="preferencesColorsPanel" tabindex="-1" data-preferences-section="colors">Colors</button>
+        <button type="button" id="preferencesFontTab" role="tab" aria-selected="false" aria-controls="preferencesFont" tabindex="-1" data-preferences-section="font">Font</button>
         <button type="button" id="preferencesFormattingTab" role="tab" aria-selected="false" aria-controls="preferencesFormatting" tabindex="-1" data-preferences-section="formatting">Formatting</button>
       </div>
       <div class="preferences-layout">
         <div class="preferences-controls">
-          <section id="preferencesAppearance" role="tabpanel" aria-labelledby="preferencesAppearanceTab">
+          <section id="preferencesThemes" role="tabpanel" aria-labelledby="preferencesThemesTab">
             <h3>Color themes</h3>
             <div class="preferences-theme-grid">
               <label class="preference-field"><span>Dark mode theme</span><select id="preferencesThemeDark"></select></label>
               <label class="preference-field"><span>Light mode theme</span><select id="preferencesThemeLight"></select></label>
             </div>
             <p class="preferences-hint">Each mode remembers its own theme. Follow System switches between them automatically. Apply saves your choices and My themes; Cancel discards this preview.</p>
-            <div class="preference-palette-header"><label class="preference-field"><span>Customize / preview</span><select id="preferencesPalette"><option value="dark">Dark mode</option><option value="light">Light mode</option></select></label><button type="button" id="preferencesResetPalette" class="preferences-small-button">Reset this mode</button></div>
-            <p id="preferencesThemeSource" class="preferences-hint"></p>
-            <label class="preference-field"><span>Theme name</span><input id="preferencesThemeName" type="text" maxlength="64" autocomplete="off" placeholder="My theme"></label>
-            <div class="preferences-theme-actions"><button type="button" id="preferencesSaveTheme">Save as New Theme</button><button type="button" id="preferencesUpdateTheme" disabled>Update saved theme</button><button type="button" id="preferencesDeleteTheme" disabled>Delete saved theme</button></div>
-            <p id="preferencesThemeStatus" class="preferences-hint" role="status" aria-live="polite"></p>
-            <h3>Syntax colors</h3><p class="preferences-hint">Choose a color square or enter a six-digit HEX color. Themes save colors; font and formatting preferences are separate.</p>
-            <div id="preferencesColors"></div>
-            <details class="preferences-surface-colors"><summary>Interface colors</summary><div id="preferencesSurfaceColors"></div></details>
+            <div class="preferences-group">
+              <div class="preferences-group-heading"><h3 id="preferencesSaveHeading">My themes</h3><button type="button" id="preferencesResetPalette" class="preferences-small-button">Reset this mode</button></div>
+              <p id="preferencesThemeSource" class="preferences-hint"></p>
+              <label class="preference-field"><span>Theme name</span><input id="preferencesThemeName" type="text" maxlength="64" autocomplete="off" placeholder="My theme"></label>
+              <div class="preferences-theme-actions"><button type="button" id="preferencesSaveTheme" class="preferences-action-primary">Save as New Theme</button><button type="button" id="preferencesUpdateTheme" disabled>Update Saved Theme</button><button type="button" id="preferencesDeleteTheme" class="preferences-action-danger" disabled>Delete</button></div>
+              <p id="preferencesThemeStatus" class="preferences-hint" role="status" aria-live="polite"></p>
+            </div>
+          </section>
+          <section id="preferencesColorsPanel" role="tabpanel" aria-labelledby="preferencesColorsTab" hidden>
+            <p id="preferencesColorsHint" class="preferences-hint">Click any part of the preview to find its color. Choose a swatch or enter a six-digit HEX color.</p>
+            <div id="preferencesColorGroups"></div>
+          </section>
+          <section id="preferencesFont" role="tabpanel" aria-labelledby="preferencesFontTab" hidden>
             <h3>Editor font</h3>
             <div class="preferences-font-grid">
               <label class="preference-field full-width"><span>Font family</span><input id="preferencesFontFamily" type="text" list="preferencesFontChoices" maxlength="100" placeholder="System monospace" autocomplete="off" aria-describedby="preferencesFontHint"></label>
@@ -190,14 +197,27 @@
               <label class="preference-field"><span>Size (px)</span><input id="preferencesFontSize" type="number" min="8" max="72" step="1" value="15" required></label>
               <label class="preference-field"><span>Line height</span><input id="preferencesLineHeight" type="number" min="1.2" max="2.4" step="0.1" value="1.6" required></label>
             </div>
-            <p id="preferencesFontHint" class="preferences-hint">Use an installed font, or leave the name blank for the default monospace font. Missing fonts fall back to monospace.</p>
+            <p id="preferencesFontHint" class="preferences-hint">Use an installed font, or leave the name blank for the default monospace font. Missing fonts fall back to monospace. Fonts are kept separately from color themes.</p>
           </section>
           <section id="preferencesFormatting" role="tabpanel" aria-labelledby="preferencesFormattingTab" hidden>
             <h3>Language formatting</h3><p class="preferences-hint">Rules are saved separately for each language. The preview uses a sample, and Format File applies the rules to the current file with Undo available.</p>
             <div id="preferencesFormatFields"></div><p id="preferencesFormatHint" class="preferences-hint"></p><button type="button" id="preferencesResetFormat" class="preferences-small-button">Reset this language</button>
           </section>
         </div>
-        <div class="preferences-preview-pane"><div class="preferences-preview-heading"><strong>Preview</strong><label for="preferencesLanguage" class="sr-only">Preview language</label><select id="preferencesLanguage"><option value="javascript">JavaScript</option></select></div><div id="preferencesThemePreview" class="preferences-theme-preview"><div class="preferences-preview-chrome" aria-hidden="true">Another Note <span>File &nbsp; Edit &nbsp; View</span></div><div class="preferences-preview-tabs" aria-hidden="true"><span id="preferencesPreviewTab">sample.js</span></div><pre id="preferencesPreview" class="preferences-preview" tabindex="0" aria-label="Editor style sample"><code id="preferencesPreviewCode"></code></pre><div class="preferences-preview-footer" aria-hidden="true">Ln 1, Col 1 <span>UTF-8</span></div></div><p id="preferencesPreviewStatus" class="preferences-preview-status" role="status" aria-live="polite">Sample preview</p></div>
+        <div class="preferences-preview-pane">
+          <div class="preferences-preview-heading"><strong>Preview</strong><label for="preferencesPalette" class="sr-only">Preview and edit mode</label><select id="preferencesPalette"><option value="dark">Dark mode</option><option value="light">Light mode</option></select><label for="preferencesLanguage" class="sr-only">Preview language</label><select id="preferencesLanguage"><option value="javascript">JavaScript</option></select></div>
+          <div id="preferencesThemePreview" class="preferences-theme-preview" aria-describedby="preferencesPreviewStatus">
+            <div class="pv-menubar" data-pref="surface:chrome"><span data-pref="surface:chrome-text"><b>Another Note</b>&nbsp;&nbsp; File &nbsp; Edit &nbsp; View &nbsp; Preferences</span></div>
+            <div class="pv-tabs" data-pref="surface:tabs"><span class="pv-tab pv-tab-active" data-pref="surface:active-tab"><span id="preferencesPreviewTab" data-pref="surface:text">sample.js</span></span><span class="pv-tab" data-pref="surface:inactive-tab"><span data-pref="surface:tab-text">notes.md</span></span><span class="pv-tab" data-pref="surface:inactive-tab"><span data-pref="surface:tab-text">todo.txt</span></span></div>
+            <div class="pv-editor" data-pref="surface:paper"><div id="preferencesPreviewGutter" class="pv-gutter" data-pref="surface:gutter" aria-hidden="true"></div><pre id="preferencesPreview" class="preferences-preview" tabindex="0" aria-label="Editor style sample"><span id="preferencesPreviewMarks" class="pv-marks" aria-hidden="true"></span><code id="preferencesPreviewCode"></code></pre></div><div id="preferencesPreviewExtra" class="pv-extra" hidden></div>
+            <div class="pv-panel" data-pref="surface:panel" data-pref-border="surface:line" aria-hidden="true">
+              <div class="pv-row"><span class="pv-input" data-pref="surface:raised" data-pref-border="surface:line-soft"><span data-pref="surface:text">Hello</span></span><span class="pv-button" data-pref="surface:raised" data-pref-border="surface:line">Replace</span><span data-pref="surface:muted">2 of 3</span><span class="pv-link" data-pref="surface:accent">Find All</span></div>
+              <div class="pv-row"><span class="pv-item" data-pref="surface:selected">Selected</span><span class="pv-item" data-pref="surface:hover">Hover</span><code class="pv-code" data-pref="surface:code">code block</code><span data-pref="surface:good">✓ Saved</span><span data-pref="surface:danger">Error</span></div>
+            </div>
+            <div class="pv-status" data-pref="surface:status" aria-hidden="true"><span data-pref="surface:status-text">Ln 3, Col 7</span><span id="preferencesPreviewMode" data-pref="surface:status-text">UTF-8 · JavaScript</span></div>
+          </div>
+          <p id="preferencesPreviewStatus" class="preferences-preview-status" role="status" aria-live="polite">Sample preview</p>
+        </div>
       </div>
       <p id="preferencesMessage" role="status" aria-live="polite"></p>
       <div class="preferences-footer"><button type="button" id="preferencesResetAll" class="preferences-reset">Restore defaults</button><button type="button" id="preferencesCancel">Cancel</button><button type="submit" id="preferencesApply" class="primary-button">Apply</button></div>

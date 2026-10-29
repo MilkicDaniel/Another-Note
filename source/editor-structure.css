@@ -4,7 +4,7 @@
 #highlight .editor-selection-newline{position:relative}
 #highlight .editor-selection-newline::after{content:'';position:absolute;left:0;top:0;bottom:0;width:1ch;background:var(--selection,#6494b54d);box-shadow:0 2px var(--selection,#6494b54d),0 -2px var(--selection,#6494b54d)}
 #highlight .editor-selection-caret{position:relative;color:inherit;background:none;border:0;outline:0;padding:0;box-shadow:none}
-#highlight .editor-selection-caret::after{content:'';position:absolute;left:-2px;top:-2px;bottom:-2px;width:5px;border-top:1px solid var(--syntax-text,var(--text));border-bottom:1px solid var(--syntax-text,var(--text));background:linear-gradient(var(--syntax-text,var(--text)),var(--syntax-text,var(--text))) center/1px 100% no-repeat}
+#highlight .editor-selection-caret::after{content:'';position:absolute;left:-2px;top:-2px;bottom:-2px;width:5px;border-top:1px solid var(--caret,var(--syntax-text,var(--text)));border-bottom:1px solid var(--caret,var(--syntax-text,var(--text)));background:linear-gradient(var(--caret,var(--syntax-text,var(--text))),var(--caret,var(--syntax-text,var(--text)))) center/1px 100% no-repeat}
 #highlight .tag-pair{color:inherit;background:none;border:0;outline:0;padding:0;text-decoration:underline dotted var(--key);text-decoration-thickness:1px;text-underline-offset:4px}
 .fold-gutter{position:relative;flex:0 0 26px;width:26px;overflow:hidden;background:var(--paper);user-select:none}
 #foldControls{position:absolute;top:9px;left:0;right:0;will-change:transform;opacity:0;transition:opacity 240ms ease-in-out}
