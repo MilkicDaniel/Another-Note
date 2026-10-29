@@ -71,6 +71,7 @@
       <div class="menu"><button class="menu-trigger" aria-haspopup="true" aria-expanded="false">Tools</button><div class="menu-popover" hidden>
         <button data-action="complete">Show Code Suggestions <kbd data-shortcut-label="complete">Ctrl+Space</kbd></button><button id="formatButton" data-action="format">Format File <kbd data-shortcut-label="format">Ctrl+Shift+L</kbd></button><button data-action="formatJSON">Format Selected JSON / Block</button>
         <div class="menu-sep"></div><button data-insert="bash">Insert Bash Block</button><button data-insert="json">Insert JSON Block</button><button data-insert="text">Insert Code Block</button>
+        <div class="menu-sep"></div><button data-action="table">Insert/Edit Table…</button><button data-action="pasteTable">Paste Table…</button>
       </div></div>
       <div class="menu"><button class="menu-trigger" aria-haspopup="true" aria-expanded="false">Preferences</button><div class="menu-popover" hidden>
         <button data-action="editorPreferences">Editor Appearance &amp; Formatting…</button><div class="menu-sep"></div>
@@ -130,6 +131,26 @@
   <input id="importFiles" type="file" multiple accept=".md,.markdown,.txt,.text,.log,.sh,.bash,.zsh,.json,.java,.js,.mjs,.cjs,.html,.htm,.css,.py,.pyw,.vnotes" hidden>
   <input id="importFolder" type="file" webkitdirectory multiple hidden>
   <template id="thirdPartyLicenses">/* THIRD_PARTY_LICENSES */</template>
+  <dialog id="tableDialog" aria-labelledby="tableDialogTitle" aria-describedby="tableDialogDescription">
+    <form id="tableForm">
+      <div class="dialog-heading table-heading"><h2 id="tableDialogTitle">Insert Table</h2><button type="button" id="tableClose" class="icon-button" aria-label="Cancel table editing">×</button></div>
+      <p id="tableDialogDescription" class="table-intro">Edit the cells, then insert the table into your file. Paste spreadsheet cells into the grid, or open “Paste or import a table” below.</p>
+      <div class="table-settings">
+        <label for="tableFormat">Insert as<select id="tableFormat"><option value="markdown">Markdown table</option><option value="html">HTML table</option><option value="tsv">Tab-separated text</option><option value="csv">CSV (comma-separated)</option></select></label>
+        <label for="tableRows">Rows<input id="tableRows" type="number" min="1" max="200" step="1" value="3" required></label>
+        <label for="tableColumns">Columns<input id="tableColumns" type="number" min="1" max="40" step="1" value="3" required></label>
+        <button type="button" id="tableResize" title="Resize the grid; cells outside the new dimensions are removed">Resize</button>
+        <label class="table-header-check"><input type="checkbox" id="tableHeader" checked>First row is a header</label>
+      </div>
+      <details id="tablePasteDetails" class="table-paste"><summary>Paste or import a table</summary><label for="tablePasteInput" class="sr-only">Paste table cells, Markdown, HTML, CSV or tab-separated text</label><textarea id="tablePasteInput" placeholder="Click here and paste from Excel, Sheets or a web table. You can also paste or type Markdown, HTML, CSV or tab-separated text." spellcheck="false"></textarea><div class="table-paste-controls"><label for="tableSeparator">Separator<select id="tableSeparator"><option value="auto">Detect automatically</option><option value="tabs">Tabs</option><option value="comma">Commas</option><option value="semicolon">Semicolons</option></select></label><button type="button" id="tableLoadPaste">Load Table</button></div></details>
+      <div class="table-tools"><button type="button" id="tableAddRow" title="Insert a row below the current cell">Add Row</button><button type="button" id="tableAddColumn" title="Insert a column after the current cell">Add Column</button><button type="button" id="tableDeleteRow">Delete Row</button><button type="button" id="tableDeleteColumn">Delete Column</button><label class="table-alignment" for="tableAlignment">Column alignment<select id="tableAlignment"><option value="none">Default</option><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label></div>
+      <div id="tableTabs" class="table-tabs" role="tablist" aria-label="Table view"><button type="button" id="tableCellsTab" role="tab" aria-selected="true" aria-controls="tableGrid" data-table-tab="cells">Edit Cells</button><button type="button" id="tablePreviewTab" role="tab" aria-selected="false" aria-controls="tablePreview" tabindex="-1" data-table-tab="preview">Preview</button><button type="button" id="tableSourceTab" role="tab" aria-selected="false" aria-controls="tableSource" tabindex="-1" data-table-tab="source">Source</button><span id="tableSummary"></span></div>
+      <div class="table-workspace"><div id="tableGrid" role="tabpanel" aria-labelledby="tableCellsTab"></div><div id="tablePreview" class="table-preview" role="tabpanel" aria-labelledby="tablePreviewTab" hidden></div><pre id="tableSource" class="table-source" role="tabpanel" aria-labelledby="tableSourceTab" tabindex="0" hidden></pre></div>
+      <div class="table-status"><p id="tableSelection">Row 1 · column A</p><p>Tab: next cell · Enter: line break · Ctrl+Enter: insert · Escape: cancel</p></div>
+      <p id="tableMessage" role="status" aria-live="polite"></p>
+      <div class="table-footer"><button type="button" id="tableCopy" class="table-secondary-action">Copy Cells</button><button type="button" id="tablePasteAsText" hidden>Paste Text Instead</button><button type="button" id="tableCancel">Cancel</button><button type="submit" id="tableApply" class="primary-button">Insert Table</button></div>
+    </form>
+  </dialog>
   <dialog id="editorPreferencesDialog" aria-labelledby="editorPreferencesTitle" aria-describedby="editorPreferencesDescription">
     <form id="editorPreferencesForm">
       <div class="dialog-heading preferences-heading"><h2 id="editorPreferencesTitle">Editor Appearance &amp; Formatting</h2><button type="button" id="preferencesClose" class="icon-button" aria-label="Cancel editor preferences">×</button></div>

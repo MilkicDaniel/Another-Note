@@ -227,7 +227,7 @@
       if(type==='cut'&&!editor.readOnly)replaceText(start,end,'');
     });
     editor.addEventListener('paste',event=>{
-      if(editor.readOnly||!event.clipboardData||!codeView)return;
+      if(event.defaultPrevented||editor.readOnly||!event.clipboardData||!codeView)return;
       const start=editor.selectionStart,end=editor.selectionEnd;if(!codeView.projection.ranges.some(range=>start<range.to&&end>range.from)&&!codeView.projection.pads?.some(pad=>pad.at>=start&&pad.at<=end))return;
       event.preventDefault();replaceText(start,end,event.clipboardData.getData('text/plain').replace(/\r\n?/g,'\n'));
     });

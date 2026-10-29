@@ -48,6 +48,7 @@ jobs:
           node checks/test_window_features.cjs
           node checks/test_editor_preferences.cjs
           node checks/test_format_preferences.cjs
+          node checks/test_table_data.cjs
       - name: Verify and assemble versioned release downloads
         shell: bash
         run: python package_release.py --output dist/releases --include-windows

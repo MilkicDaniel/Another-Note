@@ -79,7 +79,7 @@
     const scope=$('findSelection').checked?findSession?.scope:null;
     return !activityBlocked()&&!$('findBar').hidden&&note()?.id===result.fileId&&editor.value===result.documentText&&$('findInput').value===result.query&&$('findRegex').checked===result.regex&&$('findCase').checked===result.matchCase&&(!scope?result.start===0&&result.end===editor.value.length:scope.start===result.start&&scope.end===result.end);
   }
-  function activityBlocked(){return $('editorPreferencesDialog').open||$('confirmDialog').open||$('historyDialog').open||$('helpDialog').open||$('shortcutsDialog').open||$('renameDialog').open||$('closeDialog').open||$('fileChangedDialog').open||$('filesDialog').open||$('tagDialog').open||$('manageTagsDialog').open||$('dictionaryDialog').open||$('spellingDialog').open||$('licensesDialog').open||$('colorDialog').open;}
+  function activityBlocked(){return $('tableDialog').open||$('editorPreferencesDialog').open||$('confirmDialog').open||$('historyDialog').open||$('helpDialog').open||$('shortcutsDialog').open||$('renameDialog').open||$('closeDialog').open||$('fileChangedDialog').open||$('filesDialog').open||$('tagDialog').open||$('manageTagsDialog').open||$('dictionaryDialog').open||$('spellingDialog').open||$('licensesDialog').open||$('colorDialog').open;}
   async function collectFindMatches(){
     const result=inlineFindSnapshot();if(result.error||!result.query)return result;
     const found=await runSearchJob('inline',{op:'matches',query:result.query,regex:result.regex,matchCase:result.matchCase,text:result.body,offset:result.start});
