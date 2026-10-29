@@ -4,11 +4,11 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open [Another-Note-2026.10.29-r9.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r9/Another-Note-2026.10.29-r9.html) in your browser.
+- **HTML:** open [Another-Note-2026.10.29-r13.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r13/Another-Note-2026.10.29-r13.html) in your browser.
 - **Windows:** run [Another-Note-Setup-2026.10.29-r6.exe](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Setup-2026.10.29-r6.exe), or extract [Another-Note-Windows-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Windows-2026.10.29-r6.zip) and run `Another-Note.exe` inside it. This is build r6; Windows builds are published on request. Close all app windows before updating.
-- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r9.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r9/Another-Note-Fedora-2026.10.29-r9.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r13.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r13/Another-Note-Fedora-2026.10.29-r13.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
-[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r9).
+[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r13).
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
