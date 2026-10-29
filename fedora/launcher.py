@@ -19,6 +19,7 @@ APP_DIR = Path(__file__).resolve().parent
 MAX_IMPORT = 20 * 1024 * 1024
 HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}')
 header_classes = itertools.count(1)
+color_schemes = None  # libadwaita color schemes, set once the style manager is initialized
 _x11_drag_connection = None
 
 
@@ -124,6 +125,8 @@ def follow_system_theme(Gtk, Gio):
         update(desktop)
         return desktop
     Adw.init()
+    global color_schemes
+    color_schemes = {'dark': Adw.ColorScheme.FORCE_DARK, 'light': Adw.ColorScheme.FORCE_LIGHT, 'system': Adw.ColorScheme.DEFAULT}
     manager = Adw.StyleManager.get_default()
     manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
     return manager
@@ -134,8 +137,8 @@ def use_app_color_scheme(system_theme, Gtk, setting):
 
     A System setting keeps following the desktop; forcing it would also change the page's prefers-color-scheme."""
     if hasattr(system_theme, 'set_color_scheme'):
-        from gi.repository import Adw
-        system_theme.set_color_scheme({'dark': Adw.ColorScheme.FORCE_DARK, 'light': Adw.ColorScheme.FORCE_LIGHT}.get(setting, Adw.ColorScheme.DEFAULT))
+        if color_schemes:
+            system_theme.set_color_scheme(color_schemes.get(setting, color_schemes['system']))
         return
     toolkit = Gtk.Settings.get_default()
     if toolkit is not None and setting in ('light', 'dark'):

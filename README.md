@@ -4,11 +4,11 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open [Another-Note-2026.10.29-r13.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r13/Another-Note-2026.10.29-r13.html) in your browser.
+- **HTML:** open [Another-Note-2026.10.29-r14.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r14/Another-Note-2026.10.29-r14.html) in your browser.
 - **Windows:** run [Another-Note-Setup-2026.10.29-r6.exe](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Setup-2026.10.29-r6.exe), or extract [Another-Note-Windows-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Windows-2026.10.29-r6.zip) and run `Another-Note.exe` inside it. This is build r6; Windows builds are published on request. Close all app windows before updating.
-- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r13.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r13/Another-Note-Fedora-2026.10.29-r13.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r14.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r14/Another-Note-Fedora-2026.10.29-r14.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
-[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r13).
+[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r14).
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
@@ -303,3 +303,9 @@ The Fedora title bar now follows the editor theme instead of the desktop setting
 **Insert Table** now uses the theme throughout. Its **Insert as**, **Separator** and **Column alignment** lists use the app's dropdowns. The number fields no longer show GTK spin buttons; use the arrow keys to step values. The checkbox and tool buttons use theme colors, and the view tabs have a straight underline instead of a focus box. Checkboxes elsewhere in the app also use theme colors.
 
 All 43 JavaScript suites and 218 Python tests pass, along with the Chromium browser checks. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real input. It now also compares the real title bar's pixels and label color with the menu bar in both Dark and Light, and checks the table dialog's controls. Windows visual testing was not performed.
+
+## Build 2026.10.29-r14
+
+This build has the r13 features. The Fedora launcher now reads libadwaita's color schemes when it sets up the window style, rather than importing them each time the theme changes. This keeps the Fedora runtime checks working on systems without PyGObject, such as the release build machine. App behavior is unchanged from r13.
+
+All 218 Python tests pass both with and without PyGObject installed, along with the 43 JavaScript suites. The Fedora GTK/WebKit title bar and table checks passed again in a real window.

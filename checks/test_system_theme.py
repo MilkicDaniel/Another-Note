@@ -15,7 +15,7 @@ class SystemThemeTests(unittest.TestCase):
     def test_native_style_manager_follows_system_default(self):
         manager = Mock()
         adw = types.SimpleNamespace(init=Mock(), StyleManager=types.SimpleNamespace(get_default=lambda: manager),
-                                    ColorScheme=types.SimpleNamespace(DEFAULT='system'))
+                                    ColorScheme=types.SimpleNamespace(DEFAULT='system', FORCE_DARK='dark', FORCE_LIGHT='light'))
         gi = types.ModuleType('gi'); gi.require_version = Mock()
         repository = types.ModuleType('gi.repository'); repository.Adw = adw
         with patch.dict(sys.modules, {'gi': gi, 'gi.repository': repository}):
@@ -49,10 +49,8 @@ class SystemThemeTests(unittest.TestCase):
         Gtk.Settings.get_default.return_value.set_property.assert_not_called()
 
     def test_dark_or_light_choice_sets_the_title_bar_scheme_and_system_keeps_following_the_desktop(self):
-        adw = types.SimpleNamespace(ColorScheme=types.SimpleNamespace(DEFAULT='system', FORCE_DARK='dark', FORCE_LIGHT='light'))
-        repository = types.ModuleType('gi.repository'); repository.Adw = adw
         manager = Mock()
-        with patch.dict(sys.modules, {'gi.repository': repository}):
+        with patch.object(launcher, 'color_schemes', {'dark': 'dark', 'light': 'light', 'system': 'system'}):
             for setting, expected in [('dark', 'dark'), ('light', 'light'), ('system', 'system')]:
                 launcher.use_app_color_scheme(manager, Mock(), setting)
                 manager.set_color_scheme.assert_called_with(expected)
