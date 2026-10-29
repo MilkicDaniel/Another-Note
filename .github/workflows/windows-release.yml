@@ -44,11 +44,9 @@ jobs:
         shell: bash
         run: |
           python -m unittest discover -s checks -p 'test_*.py' -q
-          node checks/test_app_startup.cjs
-          node checks/test_window_features.cjs
-          node checks/test_editor_preferences.cjs
-          node checks/test_format_preferences.cjs
-          node checks/test_table_data.cjs
+          for check in checks/test_*.cjs; do
+            node "$check"
+          done
       - name: Verify and assemble versioned release downloads
         shell: bash
         run: python package_release.py --output dist/releases --include-windows
@@ -131,17 +129,18 @@ jobs:
           cat > "$notes" <<EOF
           Windows installer and portable ZIP for Another Note $version.
 
-          File > Move All Tabs to This Window gathers tabs from the other open windows, preserving drafts, selection, undo and disk bindings. Empty source windows close, while busy or unsuccessful moves retain their tabs. The destination's current tab stays selected.
-
-          Windows captures the physical mouse position in the EXE, selects per-monitor display scaling before window creation, and verifies placement after queued startup events. Dragging or resizing cancels the remaining startup checks. The reported physical second-monitor issue has not been reproduced on the single-display runner.
+          Includes the current theme presets and saved themes, tab dividers, startup improvements, gutter-only fold hover, black native startup background and closed-file reopening links. Files open in any window retain their text, tags, history, undo and recovery.
 
           Close all Another Note windows before updating. Install with Another-Note-Setup-$version.exe, or extract Another-Note-Windows-$version.zip and run Another-Note.exe inside it.
 
-          The package build verifies dependency hashes, installer payloads and editor versions. Native WinForms delayed-placement, packaged first/repeat launches, and actual editor tab consolidation with draft/selection/undo checks run on Windows before publication. The runner has one display; physical dual-monitor and mixed-DPI hardware were not available.
+          The package build verifies dependency hashes, installer payloads and editor versions. Automated native WinForms placement, packaged first/repeat launches and editor tab consolidation with draft/selection/undo checks run on Windows before publication. The runner has one display; physical dual-monitor and mixed-DPI hardware were not available.
           EOF
           if gh release view "$version" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-is-draft" 2>/dev/null; then
-            test "$(cat "$RUNNER_TEMP/release-is-draft")" = true
-            gh release upload "$version" dist/releases/* --clobber
+            if test "$(cat "$RUNNER_TEMP/release-is-draft")" = true; then
+              gh release upload "$version" dist/releases/* --clobber
+            else
+              python3 windows/publish_release.py --repo "${{ github.repository }}" --downloads dist/releases --notes "$notes"
+            fi
           else
             gh release create "$version" dist/releases/* --draft --target "$GITHUB_SHA" --title "Another Note $version" --notes-file "$notes"
           fi

@@ -1,10 +1,10 @@
 Another Note for Windows (64-bit)
 
 INSTALL
-Run Another-Note-Setup-2026.10.28-r4.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
+Run Another-Note-Setup-2026.10.29-r6.exe. It installs for your user account and adds Another Note to the Start menu. Close all app windows before installing an update, including copies started from a portable folder.
 
 PORTABLE PACKAGE
-Extract the entire Another-Note-Windows-2026.10.28-r4.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
+Extract the entire Another-Note-Windows-2026.10.29-r6.zip into a new folder, then run Another-Note.exe inside the extracted folder. Keep its runtime folder and every accompanying file together. Python is included privately; a system Python installation is not required.
 
 REQUIREMENTS
 Windows 10 or Windows 11, x64. Microsoft Edge WebView2 Runtime and .NET Framework 4.8 are required. They are normally present on current Windows installations. Official WebView2 download:
@@ -150,3 +150,17 @@ Dragging or resizing cancels those remaining startup checks. The last report
 now includes settled geometry and DPI mode:
 %LOCALAPPDATA%\Another Note\window-placement-2026.10.28-r4.json
 Physical multi-monitor hardware remains untested. Help > About shows r4.
+
+
+BUILD 2026.10.29-r6
+Includes the 16 offline theme presets, independent light/dark theme choices and
+saved custom themes. Tab dividers and the selected-tab shape follow the theme.
+Startup restores open tabs first and limits large-file display work to visible
+lines. Fold controls appear on gutter hover, with keyboard access retained.
+Native startup uses a black background while appearance settings load.
+
+Clean disk-backed files closed in every window retain a reopening link instead
+of text copies, assigned tags and version history. Reopening reads the current
+disk file. Open tabs retain their text, tags, history, undo and recovery. Drafts,
+unsaved recovery text, unavailable files and Trash keep their recovery copies.
+Closing the final window still retains its open tabs for restoration.

@@ -18,6 +18,15 @@ def source_paths(root=ROOT):
 def copy_file(source,destination):
     if source.resolve()!=destination.resolve():shutil.copyfile(source,destination)
 
+def write_checksums(output,include_windows=False):
+    output=Path(output);names=release_names(read_version())
+    keys=['html','fedora',*(['installer','windows'] if include_windows else []),'source']
+    files=[output/names[key] for key in keys]
+    # Read every input before replacing a published manifest.
+    text=''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in files)
+    checksums=output/names['checksums'];checksums.write_text(text,encoding='utf-8')
+    return checksums
+
 def package(output,include_windows=False):
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=True)
     if output==ROOT or ROOT in output.parents and 'dist' not in output.relative_to(ROOT).parts:
@@ -51,10 +60,9 @@ def package(output,include_windows=False):
         assert archive.testzip() is None
         for path in source_paths():assert archive.read('another-note-source/'+path.relative_to(ROOT).as_posix())==path.read_bytes()
     files.append(source)
-    checksums=output/names['checksums']
-    checksums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in files),encoding='utf-8')
+    checksums=write_checksums(output,include_windows)
     return files+[checksums]
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,default=ROOT/'dist');parser.add_argument('--include-windows',action='store_true');args=parser.parse_args()
-    for path in package(args.output,args.include_windows):print(path.name)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,default=ROOT/'dist');parser.add_argument('--include-windows',action='store_true');parser.add_argument('--checksums-only',action='store_true',help='Refresh checksums for existing versioned downloads without rebuilding or replacing them.');args=parser.parse_args()
+    for path in ([write_checksums(args.output,args.include_windows)] if args.checksums_only else package(args.output,args.include_windows)):print(path.name)
