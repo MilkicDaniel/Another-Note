@@ -4,11 +4,11 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open [Another-Note-2026.10.29-r6.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-2026.10.29-r6.html) in your browser.
-- **Windows:** run [Another-Note-Setup-2026.10.29-r6.exe](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Setup-2026.10.29-r6.exe), or extract [Another-Note-Windows-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Windows-2026.10.29-r6.zip) and run `Another-Note.exe` inside it. Close all app windows before updating.
-- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Fedora-2026.10.29-r6.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **HTML:** open [Another-Note-2026.10.29-r9.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r9/Another-Note-2026.10.29-r9.html) in your browser.
+- **Windows:** run [Another-Note-Setup-2026.10.29-r6.exe](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Setup-2026.10.29-r6.exe), or extract [Another-Note-Windows-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Windows-2026.10.29-r6.zip) and run `Another-Note.exe` inside it. This is build r6; Windows builds are published on request. Close all app windows before updating.
+- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r9.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r9/Another-Note-Fedora-2026.10.29-r9.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
 
-[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r6).
+[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r9).
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
@@ -248,7 +248,7 @@ Selection and copying do not modify the note or its saved table source. Apply re
 
 All 43 JavaScript suites and 210 Python tests pass. `node checks/editor_table_columns_browser.cjs` verifies the layout, unchanged regular and custom fonts, column/range copying, keyboard navigation, safe previews, exported alignment, source preservation and narrow layouts with browser and simulated native clipboard bridges. The existing table insertion/paste/undo browser regression also passes. Native GTK/Windows visual testing was not performed for this build. Local HTML and Fedora artifacts are generated with `python3 package_release.py`; published downloads above remain at r6 until this build is published. Windows builds remain on request.
 
-## Build 2026.10.29-r8 (local)
+## Build 2026.10.29-r8
 
 Tables now appear as bordered grids in the main note area, including Markdown tables in plain text notes. Headers are centered, cells have consistent padding, and inline code uses subtle backgrounds. Your editor font, size, weight and style are retained. Notes containing fenced table examples keep those examples as source. Code documents stay in the source editor.
 
@@ -256,9 +256,9 @@ Click a column heading to select that column, or click a cell and Shift-click an
 
 Right-click inside the note for Undo, Redo, Cut, Copy, Paste, Select All and **Add Table…**. Table cells also offer column selection and column/table copying. Shift+F10 opens the same menu from the keyboard. **Add Table** inserts a new table without replacing the table under the pointer. Clipboard failures and changes made while a paste is pending never discard edits or paste into another tab.
 
-This build is local; the public download links above still point to the published r6 release. Browser checks cover the main table view, source switching, columns, right-click actions, exact saved text, unchanged custom fonts, undo, small windows, clipboard failures and paste races. Desktop bridge checks use isolated browser/mocked host fixtures; these do not constitute native Windows or GTK visual testing.
+This build is included in the r9 release. Browser checks cover the main table view, source switching, columns, right-click actions, exact saved text, unchanged custom fonts, undo, small windows, clipboard failures and paste races. Desktop bridge checks use isolated browser/mocked host fixtures; these do not constitute native Windows or GTK visual testing.
 
-## Build 2026.10.29-r9 (local)
+## Build 2026.10.29-r9
 
 **Preferences → Editor Appearance & Formatting…** now has four tabs: **Themes**, **Colors**, **Font** and **Formatting**. The tabs use a plain underline for the selected tab instead of a boxed outline.
 
