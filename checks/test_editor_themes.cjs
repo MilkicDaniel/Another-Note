@@ -34,7 +34,7 @@ preferences.appearance.surfaces.dark.paper='#123456';assert.equal(style.selected
 assert.equal(preferences.customThemes['custom-work'].surfaces.paper,'#282a36');
 assert.equal(catalog.find(t=>t.id==='dracula').surfaces.paper,'#282a36','Editing a theme cannot mutate bundled presets');
 
-vm.runInContext(fs.readFileSync(path.join(root,'source/editor-preferences.js'),'utf8'),context);
+vm.runInContext('function syncSelectControls(){}function enhanceSelect(){}function closeMenus(){}\n'+fs.readFileSync(path.join(root,'source/editor-preferences.js'),'utf8'),context);
 const base=style.normalize(preferences),draft=style.normalize(base),current=style.normalize(base);
 delete draft.customThemes['custom-work'];current.customThemes['custom-other']={name:'Other',mode:'light',colors:{...style.palettes.light},surfaces:{...style.surfaces.light}};
 draft.appearance.colors.dark.number='#0a0b0c';current.appearance.colors.light.keyword='#010203';

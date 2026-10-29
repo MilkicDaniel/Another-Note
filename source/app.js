@@ -362,7 +362,7 @@
     if(!$('charCount').hidden)$('charCount').textContent=`${n.content.length.toLocaleString()} characters`;
     if(!$('noteDate').hidden)$('noteDate').textContent=`Edited ${dateText(n)}`;
     if(!$('noteType').hidden)$('noteType').textContent=`${MODES[n.mode]} ${n.mode!=='text'&&n.mode!=='markdown'?'code':'file'}`;
-    document.title=`${isFileModified(n)?'● ':''}${fileLabel(n)} — Another Note`;
+    document.title=`${fileLabel(n)} — Another Note`;
   }
 
   function trimUndoHistory(history){
@@ -452,11 +452,16 @@
     state.activeId=state.notes.find(x=>x.trashedAt&&!x.removedAt)?.id||null;save();renderAll();toast('File permanently deleted.');
   }
   function setView(){currentView='edit';if(state)state.settings.view='edit';if(typeof showSourceEditor==='function')showSourceEditor({remember:false,focus:false,repaint:false});}
+  // The desktop title bar follows the editor theme: its light/dark choice and its menu bar colors.
+  function nativeAppearance(){
+    const theme=document.body.dataset.theme==='light'?'light':'dark',style=document.body.style;
+    return {theme,setting:state?.settings.theme||'system',chrome:style.getPropertyValue('--chrome').trim(),chromeText:style.getPropertyValue('--chrome-text').trim()};
+  }
   function applySettings(){
     const s=state.settings;const resolved=s.theme==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):s.theme;
     document.body.dataset.theme=resolved;document.documentElement.dataset.theme=resolved;document.documentElement.style.colorScheme=resolved;document.documentElement.style.backgroundColor=resolved==='dark'?'#191e23':'#fcfcfc';document.documentElement.style.setProperty('--editor-size',`${s.fontSize}px`);
-    if(native)request('appearance',{theme:resolved}).catch(()=>{});
-    const lineHeight=applyEditorAppearance(resolved);document.documentElement.style.setProperty('--editor-line',`${Math.round(s.fontSize*lineHeight)}px`);
+    const lineHeight=applyEditorAppearance(resolved);
+    if(native)request('appearance',nativeAppearance()).catch(()=>{});document.documentElement.style.setProperty('--editor-line',`${Math.round(s.fontSize*lineHeight)}px`);
     delete document.documentElement.dataset.starting;
     document.documentElement.style.setProperty('--tab-size',String(editorTabSize()));$('tabSize').value=String(editorTabSize());
     document.querySelectorAll('[data-tab-size]').forEach(button=>{const selected=Number(button.dataset.tabSize)===editorTabSize();button.setAttribute('aria-checked',String(selected));button.textContent=`${selected?'✓ ':''}${button.dataset.tabSize} spaces`;});
@@ -996,7 +1001,7 @@
     const active=state.notes.find(n=>n.id===state.activeId&&!n.removedAt);if(active)trashView=Boolean(active.trashedAt);else state.activeId=state.settings.openIds.at(-1)||null;
     applySettings();renderAll();wireExternalFileChanges();finishWindowTransfer(initialTransfer);if(!startupBlocked)save();else{const message=$('errorBanner').textContent;const p=document.createElement('p');p.textContent=message;$('emptyState').append(p);$('emptyTitle').textContent='Your saved files need attention.';$('emptyState').querySelector('button').hidden=true;}
     if(initialTransfer&&!startupBlocked)await flush();
-    if(native)request('ready',{theme:document.body.dataset.theme,failed:startupBlocked,build:document.querySelector('meta[name="another-note-build"]')?.content}).then(finishStartupWork).catch(()=>{});else completeBrowserWindowSeed(startupBlocked);if(!native&&navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
+    if(native)request('ready',{...nativeAppearance(),failed:startupBlocked,build:document.querySelector('meta[name="another-note-build"]')?.content}).then(finishStartupWork).catch(()=>{});else completeBrowserWindowSeed(startupBlocked);if(!native&&navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
   }
   initialize().catch(error=>{startupBlocked=true;storageFailure=error.message;showError(`Could not start Another Note: ${error.message}`);savedIndicator('Could not open files','failed');if(native)request('ready',{theme:document.documentElement.dataset.theme||'dark',failed:true,build:document.querySelector('meta[name="another-note-build"]')?.content}).catch(()=>{});else completeBrowserWindowSeed(true);});
 })();

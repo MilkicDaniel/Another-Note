@@ -6,6 +6,7 @@ const version=fs.readFileSync(path.join(root,'VERSION'),'utf8').trim(),output=pr
 const original='function greet(name) {\n  const color = "#ff0044";\n  return "Hello " + name;\n}\n\nconst count = 3;\n';
 const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',settings:{theme:'system',openIds:['sample']},notes:[{id:'sample',title:'sample.js',content:original,mode:'javascript',createdAt:1,updatedAt:100,removedAt:0,trashedAt:0}]};
 const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+')';
+const pick=async(target,selector,value)=>{const id=await target.locator(selector).getAttribute('id'),trigger=target.locator('#'+id+'Trigger');await trigger.scrollIntoViewIfNeeded();await target.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await trigger.click();await target.locator('#'+id+'Options [data-select-value="'+value+'"]').click();};
 (async()=>{
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox']});
   const context=await browser.newContext({viewport:{width:1200,height:860},colorScheme:'dark'}),page=await context.newPage(),errors=[],network=[];
@@ -15,9 +16,9 @@ const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+'
   const open=async()=>{await page.getByRole('button',{name:'Preferences',exact:true}).click();await page.getByRole('button',{name:'Editor Appearance & Formatting…',exact:true}).click();await page.locator('#editorPreferencesDialog').waitFor({state:'visible'});};
   const apply=async()=>{await page.locator('#preferencesApply').click();await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});};
   const cancel=async()=>{await page.keyboard.press('Escape');await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});};
-  const choose=(mode,id)=>page.locator(mode==='dark'?'#preferencesThemeDark':'#preferencesThemeLight').selectOption(id);
+  const choose=(mode,id)=>pick(page,mode==='dark'?'#preferencesThemeDark':'#preferencesThemeLight',id);
   const tab=name=>page.getByRole('tab',{name,exact:true}).click();
-  const palette=mode=>page.locator('#preferencesPalette').selectOption(mode);
+  const palette=mode=>pick(page,'#preferencesPalette',mode);
   const keyword=()=>page.evaluate(()=>{const el=document.querySelector('#highlight .tok-keyword');return el?getComputedStyle(el).color:'';});
   const background=()=>page.locator('.note-pane').evaluate(el=>getComputedStyle(el).backgroundColor);
   const state=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('vista-notes.workspace.v1')).settings.editorPreferences);
@@ -60,7 +61,7 @@ const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+'
     await page.setViewportSize({width:1200,height:860});await open();await palette('light');await tab('Colors');await page.locator('[data-syntax-hex="number"]').fill('#123abc');
     const peer=await context.newPage();peer.on('pageerror',error=>errors.push(error.message));await peer.route('**/*',route=>{if(/^https?:/.test(route.request().url())){network.push(route.request().url());return route.abort();}return route.continue();});
     await peer.goto(pathToFileURL(path.join(root,'dist/Another-Note.html')).href);await peer.waitForFunction(()=>document.getElementById('editor').value.includes('const count'));
-    await peer.getByRole('button',{name:'Preferences',exact:true}).click();await peer.getByRole('button',{name:'Editor Appearance & Formatting…',exact:true}).click();await peer.locator('#preferencesThemeDark').selectOption('dracula');await peer.locator('#preferencesApply').click();await peer.locator('#editorPreferencesDialog').waitFor({state:'hidden'});
+    await peer.getByRole('button',{name:'Preferences',exact:true}).click();await peer.getByRole('button',{name:'Editor Appearance & Formatting…',exact:true}).click();await pick(peer,'#preferencesThemeDark','dracula');await peer.locator('#preferencesApply').click();await peer.locator('#editorPreferencesDialog').waitFor({state:'hidden'});
     await page.waitForFunction(()=>JSON.parse(localStorage.getItem('vista-notes.workspace.v1')).settings.editorPreferences.appearance.selectedThemes.dark==='dracula');
     await apply();const concurrent=await state();assert.equal(concurrent.appearance.selectedThemes.dark,'dracula','An open dialog retains another window’s theme selection');assert.equal(concurrent.appearance.colors.light.number,'#123abc','Applying an open dialog retains its own changed fields');assert.ok(concurrent.customThemes[lightId],'Concurrent saves retain the theme library');
     await peer.waitForFunction(()=>getComputedStyle(document.querySelector('#highlight .tok-keyword')).color==='rgb(255, 121, 198)');await peer.close();

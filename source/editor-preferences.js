@@ -136,6 +136,20 @@
     if(focus)row.querySelector('[data-pref-swatch]').focus({preventScroll:true});
     markPreviewSelection();
   }
+  // Common monospace fonts, listed only when installed. Metric-compatible aliases come after the fonts they resolve to.
+  const preferenceFontCandidates=['Cascadia Mono','Cascadia Code','Consolas','Lucida Console','Adwaita Mono','DejaVu Sans Mono','Liberation Mono','Cousine','Noto Sans Mono','Source Code Pro','Red Hat Mono','Ubuntu Mono','Fira Mono','Fira Code','JetBrains Mono','Hack','Inconsolata','Roboto Mono','IBM Plex Mono','Iosevka','Victor Mono','SF Mono','Menlo','Monaco','Nimbus Mono PS','Courier New'];
+  let preferenceFonts=null;
+  function installedPreferenceFonts(){
+    if(preferenceFonts)return preferenceFonts;
+    const context=document.createElement('canvas').getContext('2d');if(!context)return preferenceFonts=[];
+    const signature=family=>{context.font='72px '+family;const metrics=context.measureText('mmMWil10O@{}gjpqy_&');return [metrics.width,metrics.actualBoundingBoxAscent,metrics.actualBoundingBoxDescent,metrics.actualBoundingBoxLeft,metrics.actualBoundingBoxRight].map(value=>Math.round(value*10)).join();};
+    const fallback=signature('serif'),seen=new Set();
+    return preferenceFonts=preferenceFontCandidates.filter(name=>{const value=signature(JSON.stringify(name)+',serif');if(value===fallback||seen.has(value))return false;seen.add(value);return true;});
+  }
+  function renderPreferenceFonts(){
+    const current=editorPreferencesDraft.appearance.fontFamily,fonts=installedPreferenceFonts(),known=!current||fonts.some(name=>name.toLowerCase()===current.toLowerCase());
+    $('preferencesFontFamily').innerHTML=preferenceOptions([['','System monospace (default)'],...(known?[]:[[current,current+' (not installed)']]),...fonts.map(name=>[name,name])],fonts.find(name=>name.toLowerCase()===current.toLowerCase())||current);
+  }
   function renderPreferenceThemes(){
     const draft=editorPreferencesDraft,mode=$('preferencesPalette').value;
     for(const [key,id]of [['dark','preferencesThemeDark'],['light','preferencesThemeLight']]){
@@ -146,10 +160,11 @@
     const id=draft.appearance.selectedThemes[mode],saved=draft.customThemes[id],preset=EditorStyle.presets.find(theme=>theme.id===id);
     $('preferencesSaveHeading').textContent='My '+mode+' mode themes';
     $('preferencesUpdateTheme').disabled=!saved;$('preferencesDeleteTheme').disabled=!saved;
+    syncSelectControls();
     $('preferencesThemeSource').textContent=preset?preset.name+' · '+(typeof preset.author==='object'?preset.author.name:preset.author||preset.extension):saved?'Saved theme for '+mode+' mode.':'Customize the colors below, then save a named theme to use again.';
   }
   function setPreferenceTheme(mode,id){
-    editorPreferencesDraft=EditorStyle.useTheme(editorPreferencesDraft,mode,id);$('preferencesPalette').value=mode;
+    editorPreferencesDraft=EditorStyle.useTheme(editorPreferencesDraft,mode,id);$('preferencesPalette').value=mode;syncSelectControls();
     $('preferencesThemeName').value=editorPreferencesDraft.customThemes[id]?.name||'';$('preferencesThemeStatus').textContent='';
     renderPreferenceColors();schedulePreferencesPreview(false);
   }
@@ -205,18 +220,18 @@
       fields+=select('switchCaseIndent','Indent case branches',toggle);
       fields+=select('spaceRedirects','Space after redirection operators',toggle);
     }
-    $('preferencesFormatFields').innerHTML=fields;
+    $('preferencesFormatFields').innerHTML=fields;$('preferencesFormatFields').querySelectorAll('select').forEach(enhanceSelect);syncSelectControls();
     $('preferencesFormatHint').textContent=['java','javascript'].includes(mode)?'Brace removal is limited to simple statements. Declarations, comments and nested if blocks keep their braces. Brace placement applies to if and loop blocks.':mode==='python'?'Python uses indentation for blocks. Quotes and line width are formatting preferences; braces are not valid for if statements.':mode==='html'?'Changing HTML whitespace can affect how inline content displays. The default respects element display rules.':mode==='json'?'JSON keeps double quotes and valid JSON punctuation. Line width is a preference rather than a hard limit.':'Line width is a preference. The formatter keeps language syntax, comments and literal contents intact.';
   }
   function renderEditorPreferences(){
     const appearance=editorPreferencesDraft.appearance;
-    $('preferencesFontFamily').value=appearance.fontFamily;$('preferencesFontStyle').value=appearance.fontStyle;$('preferencesFontSize').value=String(editorPreferencesSize);$('preferencesLineHeight').value=String(appearance.lineHeight);
+    renderPreferenceFonts();$('preferencesFontStyle').value=appearance.fontStyle;$('preferencesFontSize').value=String(editorPreferencesSize);$('preferencesLineHeight').value=String(appearance.lineHeight);
     for(const [section,id]of preferenceSections)$(id).hidden=preferencesSection!==section;
     for(const tab of document.querySelectorAll('[data-preferences-section]')){const selected=tab.dataset.preferencesSection===preferencesSection;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;}
     const language=$('preferencesLanguage'),modes=preferencesSection==='formatting'?EditorStyle.modes:Object.keys(MODES),current=language.value;
     language.innerHTML=preferenceOptions(modes.map(mode=>[mode,MODES[mode]]),modes.includes(current)?current:'javascript');
     if(preferencesSection!=='colors')closePreferencePicker();
-    renderPreferenceColors();renderFormatPreferences();schedulePreferencesPreview();
+    renderPreferenceColors();renderFormatPreferences();syncSelectControls();schedulePreferencesPreview();
   }
   function showPreferenceSection(section,focus=false){
     preferencesSection=section;renderEditorPreferences();
@@ -339,6 +354,7 @@
     });
     frame.addEventListener('pointerleave',()=>{clearHot();if(editorPreferencesDraft&&preferencesSection!=='formatting')$('preferencesPreviewStatus').textContent=previewStatusText();});
     frame.addEventListener('click',event=>{const found=previewPrefAt(event);if(found){event.preventDefault();selectPreferenceColor(found.pref);}});
+    $('preferencesPreviewMenu').addEventListener('click',event=>{const shown=event.currentTarget.getAttribute('aria-pressed')!=='true';event.currentTarget.setAttribute('aria-pressed',String(shown));frame.classList.toggle('pv-menu-hidden',!shown);});
     $('preferencesPreview').addEventListener('scroll',()=>{$('preferencesPreviewGutter').scrollTop=$('preferencesPreview').scrollTop;});
   }
   async function applyEditorPreferences(){
@@ -355,7 +371,7 @@
     const dialog=$('editorPreferencesDialog');
     $('editorPreferencesForm').addEventListener('submit',event=>{event.preventDefault();applyEditorPreferences().catch(error=>$('preferencesMessage').textContent=error.message);});
     for(const id of ['preferencesCancel','preferencesClose'])$(id).addEventListener('click',()=>dialog.close());
-    dialog.addEventListener('close',()=>{if(dialog.open)return;clearTimeout(preferencesPreviewTimer);cancelAnimationFrame(preferencesPaintFrame);preferencesPaintFrame=0;preferencesPreviewSequence++;closePreferencePicker();editorPreferencesDraft=null;editorPreferencesBase=null;editor.focus();});
+    dialog.addEventListener('close',()=>{if(dialog.open)return;closeMenus();clearTimeout(preferencesPreviewTimer);cancelAnimationFrame(preferencesPaintFrame);preferencesPaintFrame=0;preferencesPreviewSequence++;closePreferencePicker();editorPreferencesDraft=null;editorPreferencesBase=null;editor.focus();});
     dialog.addEventListener('click',event=>{const tab=event.target.closest('[data-preferences-section]');if(tab)showPreferenceSection(tab.dataset.preferencesSection);});
     $('preferencesTabs').addEventListener('keydown',event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();
@@ -386,7 +402,7 @@
     $('preferencesResetPalette').addEventListener('click',()=>setPreferenceTheme($('preferencesPalette').value,'default-'+$('preferencesPalette').value));
     $('preferencesResetFormat').addEventListener('click',()=>{const mode=$('preferencesLanguage').value;editorPreferencesDraft.formatting[mode]=EditorStyle.normalize().formatting[mode];renderFormatPreferences();schedulePreferencesPreview();});
     $('preferencesResetAll').addEventListener('click',()=>{const customThemes=editorPreferencesDraft.customThemes;editorPreferencesDraft=EditorStyle.normalize({customThemes});editorPreferencesSize=15;closePreferencePicker();$('preferencesThemeName').value='';$('preferencesThemeStatus').textContent='Default appearance and formatting restored. My themes are kept. Apply to keep these changes.';renderEditorPreferences();});
-    $('preferencesFontFamily').addEventListener('input',event=>{editorPreferencesDraft.appearance.fontFamily=event.target.value.trim().slice(0,100);schedulePreferencesPreview(false);});
+    $('preferencesFontFamily').addEventListener('change',event=>{editorPreferencesDraft.appearance.fontFamily=event.target.value;schedulePreferencesPreview(false);});
     $('preferencesFontStyle').addEventListener('change',event=>{editorPreferencesDraft.appearance.fontStyle=event.target.value;schedulePreferencesPreview(false);});
     $('preferencesFontSize').addEventListener('input',event=>{if(event.target.validity.valid){editorPreferencesSize=Number(event.target.value);schedulePreferencesPreview(false);}});
     $('preferencesLineHeight').addEventListener('input',event=>{if(event.target.validity.valid){editorPreferencesDraft.appearance.lineHeight=Number(event.target.value);schedulePreferencesPreview(false);}});

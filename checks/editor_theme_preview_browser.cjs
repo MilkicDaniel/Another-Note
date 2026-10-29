@@ -6,6 +6,7 @@ const original='function greet(name) {\n  return "Hello " + name;\n}\n';
 const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',settings:{theme:'dark',openIds:['sample','other']},notes:[{id:'sample',title:'sample.js',content:original,mode:'javascript',createdAt:1,updatedAt:100,removedAt:0,trashedAt:0},{id:'other',title:'other.txt',content:'Other',mode:'text',createdAt:1,updatedAt:90,removedAt:0,trashedAt:0}]};
 const style=vm.runInNewContext(fs.readFileSync(path.join(root,'source/editor-style-config.js'),'utf8')+';EditorStyle');
 const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+')';
+const pick=async(target,selector,value)=>{const id=await target.locator(selector).getAttribute('id'),trigger=target.locator('#'+id+'Trigger');await trigger.scrollIntoViewIfNeeded();await target.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await trigger.click();await target.locator('#'+id+'Options [data-select-value="'+value+'"]').click();};
 (async()=>{
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox']});
   const page=await (await browser.newContext({viewport:{width:1280,height:860},colorScheme:'dark'})).newPage(),errors=[];
@@ -21,15 +22,27 @@ const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+'
     assert.equal(await page.locator('#editorPreferencesDialog input[type=color]').count(),0,'Colors use the in-app picker rather than the platform color dialog');
     const tabStyle=await page.locator('#preferencesThemesTab').evaluate(el=>{const s=getComputedStyle(el);return {radius:s.borderTopLeftRadius,outline:s.outlineStyle,left:s.borderLeftWidth};});
     assert.deepEqual(tabStyle,{radius:'0px',outline:'none',left:'0px'},'The focused selected tab is an underline, not a box');
+    // Dropdowns use the app's own list with the same field look as text inputs; theme groups keep their headings.
+    assert.equal(await page.locator('#editorPreferencesDialog select:visible').count(),0,'No platform-styled dropdowns are shown');
+    await page.locator('#preferencesThemeDarkTrigger').click();assert.deepEqual(await page.locator('#preferencesThemeDarkOptions .select-group').allTextContents(),['Built-in themes']);await page.keyboard.press('Escape');
+    assert.ok(await page.locator('#editorPreferencesDialog').isVisible(),'Escape closes only the dropdown');
+    await page.locator('#preferencesLanguageTrigger').click();const other=page.locator('#preferencesLanguageOptions [aria-selected="false"]').first();await other.hover();
+    const listColors=await page.evaluate(()=>{const v=name=>{const probe=document.createElement('i');probe.style.background=`var(--${name})`;document.body.append(probe);const c=getComputedStyle(probe).backgroundColor;probe.remove();return c;},bg=el=>getComputedStyle(el).backgroundColor;return {hovered:bg(document.querySelector('#preferencesLanguageOptions [aria-selected="false"]:hover')),chosen:bg(document.querySelector('#preferencesLanguageOptions [aria-selected="true"]')),hover:v('hover'),selected:v('selected')};});
+    assert.equal(listColors.hovered,listColors.hover,'Hovered dropdown items use the Hover color');assert.equal(listColors.chosen,listColors.selected,'The current item keeps the Selected color');assert.notEqual(listColors.hover,listColors.selected);
+    await page.keyboard.press('Escape');
+    await page.locator('#preferencesFontTab').click();
+    const field=selector=>page.locator(selector).evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.borderTopColor,s.borderTopLeftRadius,s.minHeight];});
+    assert.deepEqual(await field('#preferencesFontFamilyTrigger'),await field('#preferencesFontSize'),'Dropdowns match the text fields');assert.deepEqual(await field('#preferencesFontStyleTrigger'),await field('#preferencesFontSize'));
+    await page.locator('#preferencesThemesTab').click();
 
     // Every color setting is represented in the preview: interface parts, marks, and JavaScript plus Markdown tokens.
     const surfaces=style.surfaceTokens.map(([key])=>key);
     for(const key of surfaces)assert.ok(await page.locator(`#preferencesThemePreview [data-pref="surface:${key}"],#preferencesThemePreview [data-pref-border="surface:${key}"]`).count(),'Preview shows '+key);
     for(const language of ['javascript','markdown','text']){
-      await page.locator('#preferencesLanguage').selectOption(language);
+      await pick(page,'#preferencesLanguage',language);
       for(const key of style.tokens.map(([key])=>key).filter(key=>key!=='text'))assert.ok(await page.locator(`#preferencesThemePreview .tok-${key}`).count(),`The ${language} preview shows ${key}`);
     }
-    await page.locator('#preferencesLanguage').selectOption('javascript');
+    await pick(page,'#preferencesLanguage','javascript');
     await page.locator('#preferencesPreviewExtra .tok-property').click();assert.equal(await page.locator('.preference-color-row.selected').getAttribute('data-pref-row'),'syntax:property');
     assert.equal(await page.locator('#preferencesLanguage').inputValue(),'javascript','Choosing a color does not change the preview language');
 
@@ -42,6 +55,14 @@ const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+'
       await page.locator(selector).first().click({position:{x:3,y:3},force:true});assert.equal(await selected(),pref,selector);
       assert.ok(await page.locator(`[data-pref-row="${pref}"]`).isVisible(),pref+' row is scrolled into view');
     }
+    // The open View menu shows dropdown colors: background, border, divider, hovered item, checked item and shortcuts.
+    for(const [selector,pref,x,y]of [['.pv-menu-hover','surface:selected',2,2],['.pv-menu-active','surface:accent',3,3],['.pv-dropdown kbd','surface:muted',2,2],['.pv-menu-sep','surface:line-soft',20,4],['.pv-menu-open','surface:hover',2,2]]){
+      await page.locator(selector).first().click({position:{x,y}});assert.equal(await selected(),pref,selector);
+    }
+    const menu=await page.locator('.pv-dropdown').boundingBox();await page.mouse.click(menu.x+5.5,menu.y+menu.height/2);assert.equal(await selected(),'surface:panel','Clicking the dropdown background edits its color');await page.mouse.click(menu.x+menu.width/2,menu.y+menu.height-1);assert.equal(await selected(),'surface:line-soft','Clicking the dropdown border edits its border color');
+    await page.locator('[data-surface-hex="panel"]').fill('#123456');await page.waitForFunction(()=>getComputedStyle(document.querySelector('.pv-dropdown')).backgroundColor==='rgb(18, 52, 86)');
+    await page.locator('#preferencesPreviewMenu').click();assert.ok(!(await page.locator('.pv-dropdown').isVisible()),'The menu can be hidden to reach the code underneath');
+    await page.locator('#preferencesPreviewMenu').click();assert.ok(await page.locator('.pv-dropdown').isVisible());
     const caret=await page.locator('.pv-mark-caret').boundingBox();await page.mouse.click(caret.x+1,caret.y+caret.height/2);assert.equal(await selected(),'surface:caret');
     const border=await page.locator('.pv-button').boundingBox();await page.mouse.click(border.x+border.width/2,border.y+1);assert.equal(await selected(),'surface:line','Clicking a border edits the border color');
 
@@ -72,7 +93,7 @@ const rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+'
     await open();await page.locator('#preferencesThemesTab').focus();for(const name of ['Colors','Font','Formatting','Themes']){await page.keyboard.press('ArrowRight');assert.equal(await page.evaluate(()=>document.activeElement.textContent),name);}
     await page.locator('#preferencesColorsTab').click();await page.locator('[data-pref-swatch="surface:accent"]').click();const accent=await page.locator('[data-surface-hex="accent"]').inputValue();
     await page.locator('.preference-picker-plane').focus();await page.keyboard.press('Shift+ArrowDown');assert.notEqual(await page.locator('[data-surface-hex="accent"]').inputValue(),accent);
-    await page.locator('#preferencesPalette').selectOption('light');assert.equal(await page.locator('#preferencesPicker').evaluate(el=>el.previousElementSibling.dataset.prefRow),'surface:accent','The open picker follows a mode switch');
+    await pick(page,'#preferencesPalette','light');assert.equal(await page.locator('#preferencesPicker').evaluate(el=>el.previousElementSibling.dataset.prefRow),'surface:accent','The open picker follows a mode switch');
     await page.setViewportSize({width:540,height:780});await page.locator('.pv-status').click({position:{x:3,y:3}});assert.equal(await selected(),'surface:status');await shot('theme-preview-narrow');
     await page.keyboard.press('Escape');await page.keyboard.press('Escape');await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});
     assert.deepEqual(errors,[]);

@@ -61,7 +61,7 @@
     $('tableRows').value=String(data.rows.length);$('tableColumns').value=String(data.rows[0].length);$('tableHeader').checked=data.header;
     $('tableSelection').textContent=`Row ${row+1} · column ${tableColumnName(column)}`;$('tableSummary').textContent=`${data.rows.length} row${data.rows.length===1?'':'s'} × ${data.rows[0].length} column${data.rows[0].length===1?'':'s'}`;
     $('tableDeleteRow').disabled=data.rows.length<=1;$('tableDeleteColumn').disabled=data.rows[0].length<=1;$('tableAlignment').value=data.align[column]||'none';$('tableAlignment').disabled=!['markdown','html'].includes(format);
-    syncTableSelection();
+    syncSelectControls();syncTableSelection();
   }
   function setTableTab(tab){
     tableSession.tab=tab;

@@ -1,4 +1,4 @@
-  const selectControls=new Map();
+  const selectControls=new Map();let selectSequence=0;
   function popupPosition(anchor,width,height,viewportWidth,viewportHeight,side=false){
     const gap=8,maxX=Math.max(gap,viewportWidth-width-gap),maxY=Math.max(gap,viewportHeight-height-gap);
     let left=side?anchor.right-2:anchor.left,top=side?anchor.top:anchor.bottom+3;
@@ -49,10 +49,13 @@
   function syncSelectControls(){
     for(const [select,control] of selectControls){
       const {trigger,options}=control;
-      const signature=JSON.stringify([...select.options].map(option=>[option.value,option.textContent,option.disabled]));
+      if(select.isConnected===false){selectControls.delete(select);options.remove();continue;}
+      const signature=JSON.stringify([...select.options].map(option=>[option.value,option.textContent,option.disabled,option.parentElement?.label]));
       if(control.signature!==signature){
-        control.signature=signature;options.innerHTML='';
+        control.signature=signature;options.innerHTML='';let group=null;
         for(const option of select.options){
+          const parent=option.parentElement?.tagName==='OPTGROUP'?option.parentElement:null;
+          if(parent&&parent!==group){const heading=document.createElement('div');heading.className='select-group';heading.setAttribute('role','presentation');heading.textContent=parent.label;options.append(heading);}group=parent;
           const button=document.createElement('button');button.type='button';button.setAttribute('role','option');button.dataset.selectValue=option.value;button.textContent=option.textContent;button.disabled=option.disabled;
           button.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));closeMenus();trigger.focus();});options.append(button);
         }
@@ -66,32 +69,37 @@
       if(select.disabled){if(options.getAttribute('popover')!==null)options.hidePopover?.();options.hidden=true;trigger.setAttribute('aria-expanded','false');}
     }
   }
-  function wireSelectControls(){
-    document.querySelectorAll('#language,#tabSize,#findAllScope,#sortBy,#colorFormat,#colorOccurrence').forEach(select=>{
-      const control=document.createElement('div');control.className='select-control';
-      const trigger=document.createElement('button');trigger.type='button';trigger.className='select-trigger';trigger.id=`${select.id}Trigger`;
-      trigger.setAttribute('aria-label',select.getAttribute('aria-label')||'Search scope');trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls',`${select.id}Options`);
-      trigger.innerHTML='<span class="select-label"></span><svg aria-hidden="true"><use href="#i-chevron"/></svg>';
-      const options=document.createElement('div');options.id=`${select.id}Options`;options.className='menu-popover select-options';options.hidden=true;options.setAttribute('role','listbox');options.setAttribute('aria-labelledby',trigger.id);
-      if(select.closest('dialog')&&typeof options.showPopover==='function')options.setAttribute('popover','manual');
-      select.before(control);control.append(select,trigger,options);select.hidden=true;select.tabIndex=-1;selectControls.set(select,{trigger,options});
-      document.querySelector(`label[for="${select.id}"]`)?.setAttribute('for',trigger.id);
-      const open=()=>{if(select.disabled)return;closeMenus();syncSelectControls();options.hidden=false;if(options.getAttribute('popover'))options.showPopover();trigger.setAttribute('aria-expanded','true');positionPopup(options,trigger);};
-      trigger.addEventListener('click',()=>{if(options.hidden)open();else closeMenus();});
-      trigger.addEventListener('keydown',event=>{
-        if(event.key==='ArrowDown'||event.key==='ArrowUp'){
-          event.preventDefault();open();const items=popupItems(options),selected=items.find(button=>button.dataset.selectValue===select.value);(selected||items[event.key==='ArrowDown'?0:items.length-1])?.focus();
-        }
-      });
-      options.addEventListener('keydown',event=>{
-        if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&event.key!==' '){
-          const items=popupItems(options),index=items.indexOf(document.activeElement);
-          const ordered=[...items.slice(index+1),...items.slice(0,index+1)];
-          const match=ordered.find(button=>button.textContent.toLowerCase().startsWith(event.key.toLowerCase()));if(match){event.preventDefault();match.focus();}
-        }
-      });
-      wirePopupKeys(options,trigger);select.addEventListener('change',syncSelectControls);
+  function enhanceSelect(select){
+    if(selectControls.has(select))return;if(!select.id)select.id=`select-control-${++selectSequence}`;
+    const control=document.createElement('div');control.className='select-control';
+    const trigger=document.createElement('button');trigger.type='button';trigger.className='select-trigger';trigger.id=`${select.id}Trigger`;
+    trigger.setAttribute('aria-label',select.getAttribute('aria-label')||select.closest('label')?.querySelector('span')?.textContent||'Search scope');trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls',`${select.id}Options`);
+    trigger.innerHTML='<span class="select-label"></span><svg aria-hidden="true"><use href="#i-chevron"/></svg>';
+    const options=document.createElement('div');options.id=`${select.id}Options`;options.className='menu-popover select-options';options.hidden=true;options.setAttribute('role','listbox');options.setAttribute('aria-labelledby',trigger.id);
+    if(select.closest('dialog')&&typeof options.showPopover==='function')options.setAttribute('popover','manual');
+    select.before(control);control.append(select,trigger);
+    // Lists in dialogs sit outside scrolling panels so focusing an option never scrolls (and closes) them.
+    (select.closest('dialog')||control).append(options);select.hidden=true;select.tabIndex=-1;selectControls.set(select,{trigger,options});
+    document.querySelector(`label[for="${select.id}"]`)?.setAttribute('for',trigger.id);
+    const open=()=>{if(select.disabled)return;closeMenus();syncSelectControls();options.style.minWidth=`${trigger.offsetWidth}px`;options.hidden=false;if(options.getAttribute('popover'))options.showPopover();trigger.setAttribute('aria-expanded','true');positionPopup(options,trigger);const chosen=options.querySelector('[aria-selected="true"]');if(chosen)options.scrollTop=chosen.offsetTop-(options.clientHeight-chosen.offsetHeight)/2;};
+    trigger.addEventListener('click',()=>{if(options.hidden)open();else closeMenus();});
+    trigger.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!options.hidden){event.preventDefault();event.stopPropagation();closeMenus();}
+      else if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+        event.preventDefault();open();const items=popupItems(options),selected=items.find(button=>button.dataset.selectValue===select.value);(selected||items[event.key==='ArrowDown'?0:items.length-1])?.focus();
+      }
     });
+    options.addEventListener('keydown',event=>{
+      if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&event.key!==' '){
+        const items=popupItems(options),index=items.indexOf(document.activeElement);
+        const ordered=[...items.slice(index+1),...items.slice(0,index+1)];
+        const match=ordered.find(button=>button.textContent.toLowerCase().startsWith(event.key.toLowerCase()));if(match){event.preventDefault();match.focus();}
+      }
+    });
+    wirePopupKeys(options,trigger);select.addEventListener('change',syncSelectControls);
+  }
+  function wireSelectControls(){
+    document.querySelectorAll('#language,#tabSize,#findAllScope,#sortBy,#colorFormat,#colorOccurrence,#editorPreferencesDialog select,#tableDialog select').forEach(enhanceSelect);
     syncSelectControls();
   }
   function wireMenus(){

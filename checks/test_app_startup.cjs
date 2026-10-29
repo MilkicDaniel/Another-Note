@@ -10,7 +10,7 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 function classList(){const names=new Set();return {add(...items){items.forEach(item=>names.add(item));},remove(...items){items.forEach(item=>names.delete(item));},toggle(name,force){if(force===undefined)force=!names.has(name);force?names.add(name):names.delete(name);return force;},contains:name=>names.has(name)};}
 function element(id=''){
   let markup='';const children=[],listeners=new Map();
-  return {id,value:'',hidden:false,disabled:false,checked:false,open:false,dataset:{},classList:classList(),style:{setProperty(){},overflowY:''},children,
+  return {id,value:'',hidden:false,disabled:false,checked:false,open:false,dataset:{},classList:classList(),style:{setProperty(){},getPropertyValue(){return '';},overflowY:''},children,
     scrollTop:0,scrollLeft:0,selectionStart:0,selectionEnd:0,clientWidth:960,clientHeight:600,
     get scrollHeight(){return this.value.split('\n').length*18+8;},
     get innerHTML(){return markup;},set innerHTML(value){markup=value;},
@@ -217,14 +217,14 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
     const edit=text=>{editor.emit('beforeinput',{inputType:'insertText'});editor.value=text;editor.emit('input');api.renderTabs();};
     edit('  Project <draft> & plans  \nSecond line');
     assert.equal(api.fileLabel(file),'Project <draft> & plans');assert.equal(file.title,'','Automatic labels never overwrite the actual filename');
-    assert.match(elements.get('fileTabs').innerHTML,/Project &lt;draft&gt; &amp; plans/);assert.equal(context.document.title,'● Project <draft> & plans — Another Note');
+    assert.match(elements.get('fileTabs').innerHTML,/Project &lt;draft&gt; &amp; plans/);assert.equal(context.document.title,'Project <draft> & plans — Another Note','The window title has no unsaved marker; the tab shows it');
     assert.equal(api.exportName(file),'Project -draft- & plans.txt');assert.equal(file.savedSignature,baseline);
     const recovered=api.validateWorkspace(plain(api.getState())).notes.at(-1);assert.equal(api.fileLabel(recovered),'Project <draft> & plans','Derived labels survive recovery and moving between windows');
-    edit('Changed first line\nSecond line');assert.equal(context.document.title,'● Changed first line — Another Note');
+    edit('Changed first line\nSecond line');assert.equal(context.document.title,'Changed first line — Another Note');
     edit('');assert.equal(api.fileLabel(file),'untitled');assert.equal(api.isFileModified(file),false,'Clearing the draft restores its original saved baseline');
     edit('\nText on another line');assert.equal(api.fileLabel(file),'untitled');
     const title=elements.get('noteTitle');title.value='named.json';title.emit('input');
-    edit('Different content\nnext');assert.equal(api.fileLabel(file),'named.json');assert.equal(context.document.title,'● named.json — Another Note');
+    edit('Different content\nnext');assert.equal(api.fileLabel(file),'named.json');assert.equal(context.document.title,'named.json — Another Note');
   }
   {
     const {context,elements,messages,window}=await launch({native:true});const editor=elements.get('editor'),dialog=elements.get('closeDialog');

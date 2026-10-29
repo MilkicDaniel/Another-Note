@@ -27,6 +27,7 @@ def captured_launch_point(platform):
     return platform.launch_point()
 
 class DifferentBuildRunning(RuntimeError):pass
+class PrimaryUnavailable(RuntimeError):pass
 
 class Instance:
     def __init__(self,folder,release):
@@ -49,7 +50,7 @@ class Instance:
                     if launch_point is not None:request['launchPoint']=launch_point
                     connection.send_bytes(json.dumps(request).encode())
                     try:
-                        if not connection.poll(2):raise EOFError()
+                        if not connection.poll(15):raise EOFError()
                         reply=json.loads(connection.recv_bytes(4096))
                     except (EOFError,ValueError,OSError):
                         raise DifferentBuildRunning('An older copy of Another Note is already running. Close all Another Note windows, then open build '+self.build+' again. Your files have been kept.')
@@ -58,7 +59,7 @@ class Instance:
                         raise DifferentBuildRunning('Another Note'+(' build '+str(running) if running else '')+' is already running from a different package. Close all Another Note windows, then open build '+self.build+' again. Your files have been kept.')
                     return
             except OSError:time.sleep(.1)
-        raise RuntimeError('Another Note is already running but is still starting. Try opening the files again in a moment.')
+        raise PrimaryUnavailable('Another Note is still starting or closing. Try again in a moment. Your files have been kept.')
     def receive(self,app,connection):
         request=json.loads(connection.recv_bytes(1024*1024));structured=isinstance(request,dict)
         if structured:
@@ -90,6 +91,7 @@ class Instance:
                             try:
                                 self.receive(app,connection)
                             except (ValueError,OSError,EOFError):continue
+                            except Exception as error:app.log('Local app request: '+str(error))
             except Exception as error:app.log('Local app connection: '+str(error))
         threading.Thread(target=receive,daemon=True).start()
     def close(self):
@@ -97,13 +99,19 @@ class Instance:
 
 def main():
     if os.name!='nt':raise RuntimeError('Run Another-Note.exe on Windows 10 or 11 (64-bit).')
-    platform=WindowsPlatform();instance=None;folder=data_folder()
+    platform=WindowsPlatform();instance=None;folder=data_folder();starting_webview=False
     try:
         platform.initialize_dpi()
         try:launch_point=captured_launch_point(platform)
         except OSError:launch_point=None
-        instance=Instance(folder,load_release(ROOT))
-        if not instance.primary:instance.forward(sys.argv[1:],launch_point);return 0
+        release=load_release(ROOT);instance=Instance(folder,release);deadline=time.monotonic()+15
+        while not instance.primary:
+            # A closing app keeps the instance lock until it exits; wait for it, then start normally.
+            try:instance.forward(sys.argv[1:],launch_point);return 0
+            except PrimaryUnavailable:
+                if time.monotonic()>deadline:raise
+            instance.close();time.sleep(.25);instance=Instance(folder,release)
+        starting_webview=True
         import webview
         webview.settings['ALLOW_FILE_URLS']=True;webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER']=True
         app=Application(webview,platform,folder);editor=app.new_window(launch_point=launch_point);editor.pending_imports=[str(Path(p).expanduser().resolve()) for p in sys.argv[1:]];instance.serve(app)
@@ -113,7 +121,8 @@ def main():
         platform.message(str(error));return 1
     except Exception as error:
         folder.mkdir(parents=True,exist_ok=True);(folder/'startup-error.log').write_text(traceback.format_exc(),encoding='utf-8')
-        platform.message('Another Note could not start.\n\n'+str(error)+'\n\nThis build requires Microsoft Edge WebView2 Runtime. If it is missing, install it from the Microsoft link in README.txt. Your saved files have been kept.\n\nDetails: '+str(folder/'startup-error.log'));return 1
+        hint='This build requires Microsoft Edge WebView2 Runtime. If it is missing, install it from the Microsoft link in README.txt. ' if starting_webview else ''
+        platform.message('Another Note could not start.\n\n'+str(error)+'\n\n'+hint+'Your saved files have been kept.\n\nDetails: '+str(folder/'startup-error.log'));return 1
     finally:
         if instance:instance.close()
 

@@ -271,3 +271,35 @@ Colors are grouped as Syntax, Markdown, Editor, Tabs, Menu & status bars, Panels
 Three new colors are available: **Text cursor**, **Search matches** and **Inactive tab text**. Existing themes and saved colors derive them from the editor text, the default search highlight and secondary text, so current themes remain unchanged and are not marked as modified.
 
 All 43 JavaScript suites and 212 Python tests pass. `node checks/editor_theme_preview_browser.cjs` verifies that every color appears in the preview. It also checks click-to-edit for text, marks, borders and interface parts; live picker changes; revert, swatch and keyboard use; the new colors after Apply; and narrow layouts. The existing theme, preferences and startup browser checks also pass. These checks ran in Chromium. The Fedora GTK/WebKit window (WebKitGTK 6.0 2.54) was also tested with real mouse and keyboard input through XWayland, using a temporary notebook. That test covered the picker area, hue slider, theme swatches, Escape, clicking preview parts, typed HEX values, the Font tab, Apply and the underline-only tab focus. Rerun it with `python3 checks/editor_theme_preview_gtk.py` after `python3 build.py`. It opens a visible window, needs `xdotool`, and saves snapshots when `QA_SCREENSHOTS` is set. Windows visual testing was not performed.
+
+## Build 2026.10.29-r10
+
+The window title no longer starts with a dot when a file has unsaved changes. The tab still shows the unsaved marker.
+
+The theme preview now shows an open **Preferences** menu from the menu bar. It covers the dropdown background, border, divider, hovered item, checked item and shortcut text, plus the highlighted menu-bar entry. Click any part of the menu to edit its color, or click its border to edit the border color. The **Menu** button above the preview hides the menu if it covers code you want to click.
+
+All 43 JavaScript suites and 212 Python tests pass, along with the Chromium theme preview, theme, preferences, startup, table and closed-file checks. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real input, including a click on the open menu. Windows visual testing was not performed.
+
+## Build 2026.10.29-r11
+
+Dropdowns in **Editor Appearance & Formatting** now use the app's own menu style. They have the same field look as the text boxes, and the theme list shows **Built-in themes** and **My themes** headings. Escape closes an open dropdown without closing the dialog.
+
+**Font family** is now a dropdown of monospace fonts installed on the computer, with **System monospace (default)** first. A previously typed font that is not installed stays selected and is marked "(not installed)".
+
+On Windows, the WebView2 Runtime message now appears only when the window engine itself fails to start. Opening a new window while the last one is still closing used to show this message by mistake. Now the app waits for the old process to finish and then opens normally. A failed request between windows no longer stops later new-window requests from working.
+
+All 43 JavaScript suites and 216 Python tests pass, along with the Chromium theme preview, theme, preferences, startup, table and closed-file checks. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real input, including opening the font dropdown, choosing a font and closing a dropdown with Escape. The Windows launcher changes are covered by unit tests with a mocked host; Windows visual testing was not performed.
+
+## Build 2026.10.29-r12
+
+Dropdown lists now use the theme's **Hover** color for the item under the pointer or keyboard focus. **Selected items** stays on the checked current choice and on an open dropdown's button, so the two are no longer the same color. This applies to every app dropdown, including the preview's mode and language lists.
+
+All 43 JavaScript suites, 216 Python tests and the Chromium browser checks pass. The theme preview check confirms that hovered items use the Hover color and the current item keeps the Selected color.
+
+## Build 2026.10.29-r13
+
+The Fedora title bar now follows the editor theme instead of the desktop setting. With **Dark** or **Light** chosen in the theme menu, GTK uses that mode for the window and its buttons. The title bar takes the theme's menu bar color and text color, so a dark theme stays dark during a light desktop day. **System** keeps following the desktop.
+
+**Insert Table** now uses the theme throughout. Its **Insert as**, **Separator** and **Column alignment** lists use the app's dropdowns. The number fields no longer show GTK spin buttons; use the arrow keys to step values. The checkbox and tool buttons use theme colors, and the view tabs have a straight underline instead of a focus box. Checkboxes elsewhere in the app also use theme colors.
+
+All 43 JavaScript suites and 218 Python tests pass, along with the Chromium browser checks. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real input. It now also compares the real title bar's pixels and label color with the menu bar in both Dark and Light, and checks the table dialog's controls. Windows visual testing was not performed.

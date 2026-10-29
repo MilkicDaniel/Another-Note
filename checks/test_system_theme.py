@@ -48,6 +48,15 @@ class SystemThemeTests(unittest.TestCase):
             self.assertIsNone(follow_system_theme(Gtk, Gio))
         Gtk.Settings.get_default.return_value.set_property.assert_not_called()
 
+    def test_dark_or_light_choice_sets_the_title_bar_scheme_and_system_keeps_following_the_desktop(self):
+        adw = types.SimpleNamespace(ColorScheme=types.SimpleNamespace(DEFAULT='system', FORCE_DARK='dark', FORCE_LIGHT='light'))
+        repository = types.ModuleType('gi.repository'); repository.Adw = adw
+        manager = Mock()
+        with patch.dict(sys.modules, {'gi.repository': repository}):
+            for setting, expected in [('dark', 'dark'), ('light', 'light'), ('system', 'system')]:
+                launcher.use_app_color_scheme(manager, Mock(), setting)
+                manager.set_color_scheme.assert_called_with(expected)
+
 
 class StartupWindowTests(unittest.TestCase):
     def app(self):
@@ -79,6 +88,7 @@ class StartupWindowTests(unittest.TestCase):
             events.append(('load',))
         view.load_uri.side_effect = load
         GLib.timeout_add_seconds.return_value = 9
+        scheme = patch('launcher.use_app_color_scheme'); self.scheme = scheme.start(); self.addCleanup(scheme.stop)
         with patch('launcher.load_toolkit', return_value=(Gtk, WebKit, Gio, GLib, Gdk, Pango)), patch('launcher.follow_system_theme'):
             app = launcher.run()
         return app.primary, events, Gtk, GLib
@@ -98,6 +108,19 @@ class StartupWindowTests(unittest.TestCase):
                 other = 'light' if theme == 'dark' else 'dark'
                 app.on_message(None, types.SimpleNamespace(to_string=lambda: json.dumps({'id': 'theme-2', 'command': 'appearance', 'theme': other})))
                 self.assertEqual(events[-1], ('background', '#fcfcfc' if other == 'light' else '#000000'))
+
+    def test_title_bar_uses_the_editor_menu_bar_colors(self):
+        app, events, Gtk, GLib = self.app()
+        send = lambda data: app.on_message(None, types.SimpleNamespace(to_string=lambda: json.dumps({'id': 'a', 'command': 'appearance', **data})))
+        send({'theme': 'dark', 'setting': 'dark', 'chrome': '#1f2329', 'chromeText': '#d0d6dc'})
+        self.assertEqual(self.scheme.call_args.args[2], 'dark')
+        css = Gtk.CssProvider.return_value.load_from_string.call_args.args[0]
+        self.assertIn('headerbar.' + app.header_class + ' {background:#1f2329;color:#d0d6dc', css)
+        Gtk.HeaderBar.return_value.add_css_class.assert_any_call(app.header_class)
+        calls = Gtk.CssProvider.return_value.load_from_string.call_count
+        send({'theme': 'dark', 'setting': 'system', 'chrome': 'red;} * {color:red', 'chromeText': '#ffffff'})
+        self.assertEqual(Gtk.CssProvider.return_value.load_from_string.call_count, calls, 'Only plain HEX colors reach native CSS')
+        self.assertEqual(self.scheme.call_args.args[2], 'system')
 
     def test_startup_timeout_or_load_error_remains_visible_and_closable(self):
         for failure in ('timeout', 'load'):

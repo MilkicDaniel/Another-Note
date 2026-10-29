@@ -119,6 +119,34 @@ def load_toolkit():
             js(code, got)
         return step
 
+    def titlebar_check(theme):
+        """Compare the real GTK title bar (pixels and label color) with the page's menu bar colors."""
+        def step(nxt):
+            def got(page):
+                window = state['app'].get_windows()[0]; header = window.get_titlebar(); color = header.get_title_widget().get_color()
+                label = '#%02x%02x%02x' % tuple(round(c * 255) for c in (color.red, color.green, color.blue))
+                image = subprocess.run(['import', '-window', state['window'][0], '-depth', '8', 'ppm:-'], capture_output=True, timeout=15).stdout
+                pixel = None
+                try:
+                    _magic, size, _depth, data = image.split(b'\n', 3); width = int(size.split()[0])
+                    # Locate the header from GTK's layout: surface offset (client-side shadow) plus header bounds, in device pixels.
+                    ok_bounds, bounds = header.compute_bounds(window); dx, dy = window.get_native().get_surface_transform(); scale = window.get_scale_factor()
+                    x = int((dx + bounds.get_x() + bounds.get_width() * .25) * scale); y = int((dy + bounds.get_y() + 4) * scale)
+                    pixel = '#%02x%02x%02x' % tuple(data[(y * width + x) * 3:(y * width + x) * 3 + 3])
+                    if OUT: (OUT / ('8-titlebar-' + theme + '.ppm')).write_bytes(image)
+                except Exception as error:
+                    results['errors'].append('titlebar capture: %s' % error)
+                near = lambda a, b: a and b and all(abs(int(a[i:i + 2], 16) - int(b[i:i + 2], 16)) <= 6 for i in (1, 3, 5))
+                from gi.repository import Adw
+                value = {'page': page, 'label': label, 'pixel': pixel, 'dark': Adw.StyleManager.get_default().get_dark()}
+                ok = page and near(pixel, page['chrome']) and near(label, page['text']) and value['dark'] == (theme == 'dark')
+                results['steps'].append({'check': 'title bar follows the ' + theme + ' editor theme', 'ok': bool(ok), 'value': value}); nxt()
+            js("const s=document.body.style;return {chrome:s.getPropertyValue('--chrome').trim(),text:s.getPropertyValue('--chrome-text').trim()}", got)
+        return step
+
+    def choose_theme(theme):
+        return lambda n: js("document.querySelector('[data-theme-choice=\"%s\"]').click();return 1" % theme, lambda v: GLib.timeout_add(900, lambda: (n(), False)[1]))
+
     # Map page coordinates to X screen coordinates from two real clicks; this covers
     # client-side decorations, header bars and display scaling.
     def calibrate(n):
@@ -127,6 +155,8 @@ def load_toolkit():
         def go(i):
             if i == len(pts):
                 def got(v):
+                    if not v or len(v) < 2:
+                        results['errors'].append('calibration clicks did not reach the window; keep it in front while the check runs'); state['app'].quit(); return
                     (c1, c2) = v[-2:]; bx = (pts[1][0] - pts[0][0]) / (c2[0] - c1[0]); by = (pts[1][1] - pts[0][1]) / (c2[1] - c1[1])
                     state['map'] = ((pts[0][0] - bx * c1[0], bx), (pts[0][1] - by * c1[1], by)); results['map'] = state['map']; n()
                 js("return window.__probeSeen", got); return
@@ -155,6 +185,8 @@ def load_toolkit():
         ('tab-ok', check('click preview active tab selects Active tab', "return document.querySelector('.preference-color-row.selected')?.dataset.prefRow", lambda v: v == 'surface:active-tab')),
         ('click-status', lambda n: click_selector('.pv-status', n, .5, .5)),
         ('status-ok', check('click status bar selects Status bar', "return document.querySelector('.preference-color-row.selected')?.dataset.prefRow", lambda v: v in ('surface:status', 'surface:status-text'))),
+        ('click-menu', lambda n: click_selector('.pv-menu-hover', n, .92, .5)),
+        ('menu-ok', check('click open menu item selects Selected items', "return document.querySelector('.preference-color-row.selected')?.dataset.prefRow", lambda v: v == 'surface:selected')),
         ('click-caret', lambda n: click_selector('.pv-mark-caret', n, .5, .5)),
         ('caret-ok', check('click caret selects Text cursor', "return document.querySelector('.preference-color-row.selected')?.dataset.prefRow", lambda v: v == 'surface:caret')),
         ('focus-hex', lambda n: click_selector('[data-surface-hex="caret"]', n)),
@@ -166,11 +198,26 @@ def load_toolkit():
         ('snap-light', lambda n: snapshot('5-light', n)),
         ('font-tab', lambda n: click_selector('#preferencesFontTab', n)),
         ('font-ok', check('Font tab opens with real click', "return [document.getElementById('preferencesFont').hidden,document.getElementById('preferencesFontTab').getAttribute('aria-selected')]", lambda v: v == [False, 'true'])),
+        ('font-list', lambda n: click_selector('#preferencesFontFamilyTrigger', n)),
+        ('font-list-ok', check('font family is an app-styled dropdown of installed fonts', "const o=document.getElementById('preferencesFontFamilyOptions');return [o.matches(':popover-open'),o.querySelectorAll('[role=option]').length>1,document.querySelectorAll('#editorPreferencesDialog select:not([hidden])').length]", lambda v: v == [True, True, 0])),
         ('snap-font', lambda n: snapshot('6-font', n)),
+        ('font-pick', lambda n: click_selector('#preferencesFontFamilyOptions [role=option]:nth-child(2)', n)),
+        ('font-pick-ok', check('clicking a font chooses it and updates the preview', "const v=document.getElementById('preferencesFontFamily').value;return [v.length>0,document.getElementById('preferencesFontFamilyTrigger').textContent===v,getComputedStyle(document.getElementById('preferencesPreview')).fontFamily.includes(v),document.getElementById('preferencesFontFamilyOptions').matches(':popover-open')]", lambda v: v == [True, True, True, False])),
+        ('style-list', lambda n: click_selector('#preferencesFontStyleTrigger', n)),
+        ('style-esc', lambda n: key('Escape', n)),
+        ('style-esc-ok', check('Escape closes only the dropdown', "return [document.getElementById('preferencesFontStyleOptions').matches(':popover-open'),document.getElementById('editorPreferencesDialog').open]", lambda v: v == [False, True])),
         ('dark-back', lambda n: js("const s=document.getElementById('preferencesPalette');s.value='dark';s.dispatchEvent(new Event('change',{bubbles:true}));return 1", lambda v: n())),
         ('apply', lambda n: click_selector('#preferencesApply', n)),
         ('applied', check('Apply: caret color in real editor + dialog closed', "return [document.getElementById('editorPreferencesDialog').open,getComputedStyle(document.getElementById('editor')).caretColor]", lambda v: v == [False, 'rgb(0, 255, 136)'])),
         ('snap-app', lambda n: snapshot('7-applied', n)),
+        ('theme-dark', choose_theme('dark')),
+        ('titlebar-dark', titlebar_check('dark')),
+        ('theme-light', choose_theme('light')),
+        ('titlebar-light', titlebar_check('light')),
+        ('theme-dark-2', choose_theme('dark')),
+        ('table', lambda n: js("document.querySelector('[data-action=table]').click();return 1", lambda v: GLib.timeout_add(700, lambda: (n(), False)[1]))),
+        ('table-ok', check('table dialog uses themed controls', "const d=document.getElementById('tableDialog'),cb=getComputedStyle(document.getElementById('tableHeader'));return [d.open,d.querySelectorAll('select:not([hidden])').length,cb.appearance,cb.height]", lambda v: v == [True, 0, 'none', '14px'])),
+        ('snap-table', lambda n: snapshot('9-table', n)),
     ]
 
     def run_steps():
@@ -193,6 +240,6 @@ tmp.cleanup()
 results['errors'] = [e for e in results['errors'] if e]
 failed = [step['check'] for step in results['steps'] if not step['ok']]
 for step in results['steps']: print(('ok    ' if step['ok'] else 'FAIL  ') + step['check'] + ('' if step['ok'] else ': ' + json.dumps(step['value'])))
-if failed or results['errors'] or results.get('timeout') or len(results['steps']) < 13:
+if failed or results['errors'] or results.get('timeout') or len(results['steps']) < 20:
     raise SystemExit('Native theme preview check failed: ' + json.dumps({'failed': failed, 'errors': results['errors'], 'timeout': results.get('timeout', False)}))
 print('Passed: native GTK/WebKit theme preferences with real input: in-app picker drag/hue/swatches/Escape, click-to-edit preview parts, live HEX, tabs and Apply.')

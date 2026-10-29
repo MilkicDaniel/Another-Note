@@ -4,6 +4,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.join(__dirname,'..'),version=fs.readFileSync(path.join(root,'VERSION'),'utf8').trim(),output=process.env.QA_SCREENSHOTS;
 const original='// Original draft\nfunction f(value){if(value) return "hello"; else {return "bye";}}';
 const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',settings:{theme:'dark',fontSize:15,openIds:['sample']},notes:[{id:'sample',title:'sample.js',content:original,mode:'javascript',createdAt:1,updatedAt:100,removedAt:0,trashedAt:0}]};
+const pick=async(target,selector,value)=>{const id=await target.locator(selector).getAttribute('id'),trigger=target.locator('#'+id+'Trigger');await trigger.scrollIntoViewIfNeeded();await target.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await trigger.click();await target.locator('#'+id+'Options [data-select-value="'+value+'"]').click();};
 (async()=>{
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox']});
   const context=await browser.newContext({viewport:{width:1280,height:900},colorScheme:'dark'}),page=await context.newPage(),errors=[],network=[];
@@ -17,16 +18,16 @@ const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',se
   const apply=async()=>{await page.locator('#preferencesApply').click();await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});};
   try{
     await page.goto(pathToFileURL(path.join(root,'dist/Another-Note.html')).href);await page.waitForFunction(()=>document.getElementById('editor').value.includes('Original draft'));
-    await open();await tab('Font');await page.locator('#preferencesFontStyle').selectOption('italic');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');
-    assert.equal(await page.locator('#preferencesPreview .tok-keyword').first().evaluate(el=>getComputedStyle(el).color),'rgb(255, 136, 68)');
+    await open();await tab('Font');await pick(page,'#preferencesFontStyle','italic');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('#preferencesPreview .tok-keyword')).color==='rgb(255, 136, 68)',null,{timeout:3000});
     assert.equal(await page.locator('#editor').evaluate(el=>getComputedStyle(el).fontStyle),'normal');assert.equal(await text(),original);
     await page.keyboard.press('Escape');await page.locator('#editorPreferencesDialog').waitFor({state:'hidden'});assert.equal(await text(),original);
     await open();assert.equal(await page.locator('#preferencesFontStyle').inputValue(),'regular','Cancel restores the saved preferences');
-    await tab('Font');await page.locator('#preferencesFontFamily').fill('DejaVu Sans Mono');await page.locator('#preferencesFontStyle').selectOption('bold-italic');await page.locator('#preferencesFontSize').fill('18');await page.locator('#preferencesLineHeight').fill('1.8');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');await shot('preferences-dark');
-    await page.locator('#preferencesPalette').selectOption('light');await page.locator('[data-syntax-hex="keyword"]').fill('#0f659f');await shot('preferences-light');
-    await page.locator('#preferencesPalette').selectOption('dark');await page.getByRole('tab',{name:'Formatting',exact:true}).click();
-    await page.locator('#preferencesLanguage').selectOption('javascript');
-    for(const [key,value]of Object.entries({bracePolicy:'always',ifLayout:'multiline',bracePlacement:'next-line',elsePlacement:'next-line',quoteStyle:'single',semicolons:'false'}))await page.locator(`[data-format-preference="${key}"]`).selectOption(value);
+    await tab('Font');const fonts=await page.locator('#preferencesFontFamily option').evaluateAll(options=>options.map(option=>option.value));assert.equal(fonts[0],'','System monospace is the first font choice');assert.ok(fonts.length>1,'Installed monospace fonts are listed');await pick(page,'#preferencesFontFamily',fonts[1]);assert.equal(await page.locator('#preferencesFontFamilyTrigger').textContent(),fonts[1]);await pick(page,'#preferencesFontStyle','bold-italic');await page.locator('#preferencesFontSize').fill('18');await page.locator('#preferencesLineHeight').fill('1.8');await tab('Colors');await page.locator('[data-syntax-hex="keyword"]').fill('#ff8844');await shot('preferences-dark');
+    await pick(page,'#preferencesPalette','light');await page.locator('[data-syntax-hex="keyword"]').fill('#0f659f');await shot('preferences-light');
+    await pick(page,'#preferencesPalette','dark');await page.getByRole('tab',{name:'Formatting',exact:true}).click();
+    await pick(page,'#preferencesLanguage','javascript');
+    for(const [key,value]of Object.entries({bracePolicy:'always',ifLayout:'multiline',bracePlacement:'next-line',elsePlacement:'next-line',quoteStyle:'single',semicolons:'false'}))await pick(page,`[data-format-preference="${key}"]`,value);
     await page.waitForFunction(()=>document.getElementById('preferencesPreviewStatus').textContent.startsWith('Formatted sample'));
     assert.match(await page.locator('#preferencesPreviewCode').textContent(),/if \(name\)\n\s+\{/);await shot('format-preferences');
     assert.equal(await text(),original);await apply();assert.equal(await text(),original,'Applying preferences never changes source text');
@@ -42,11 +43,11 @@ const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',se
     await page.reload();await page.waitForFunction(()=>getComputedStyle(document.getElementById('editor')).fontStyle==='italic');assert.equal(await text(),original);
     await page.getByRole('button',{name:'Preferences',exact:true}).click();await page.getByRole('menuitemradio',{name:'Light',exact:true}).click();
     assert.equal(await page.locator('#highlight .tok-keyword').first().evaluate(el=>getComputedStyle(el).color),'rgb(15, 101, 159)','Each app theme uses its own saved syntax palette');
-    await open();await tab('Font');await page.locator('#preferencesFontFamily').fill('Arial');await apply();
-    assert.equal(await page.locator('#editor').evaluate(el=>getComputedStyle(el).font),await page.locator('.line-measure').evaluate(el=>getComputedStyle(el).font),'Proportional font metrics also match the text/caret mirror');
+    await open();await tab('Font');const last=await page.locator('#preferencesFontFamily option').last().getAttribute('value');await pick(page,'#preferencesFontFamily',last);await apply();assert.match(await page.locator('#editor').evaluate(el=>getComputedStyle(el).fontFamily),new RegExp(last));
+    assert.equal(await page.locator('#editor').evaluate(el=>getComputedStyle(el).font),await page.locator('.line-measure').evaluate(el=>getComputedStyle(el).font),'Another font keeps the text/caret mirror metrics matched');
     await page.setViewportSize({width:540,height:780});await open();const bounds=await page.locator('#editorPreferencesDialog').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=541&&bounds.y>=0&&bounds.y+bounds.height<=781);
     assert.ok(await page.locator('#preferencesApply').isVisible());await shot('preferences-narrow');await page.keyboard.press('Escape');
     assert.deepEqual(errors,[]);assert.deepEqual(network,[],'The preferences editor and formatters work offline');
-    console.log('Passed: real browser preferences, Cancel/Apply, both palettes, matching font geometry, formatted preview, source preservation, undo, restart, proportional font and narrow layout.');
+    console.log('Passed: real browser preferences, Cancel/Apply, both palettes, matching font geometry, formatted preview, source preservation, undo, restart, installed-font dropdown and narrow layout.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

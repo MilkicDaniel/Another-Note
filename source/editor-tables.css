@@ -46,3 +46,13 @@
 .table-result [data-table-preview-row]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .table-status p{min-width:0}
 @media(max-width:700px){#tableGrid{padding:12px}#tableSelectColumn{margin-left:0}.table-preview{padding:12px}}
+
+/* Dialog controls follow the editor theme instead of the platform toolkit. */
+#tableDialog .select-trigger{min-height:30px;height:auto;min-width:0;padding:4px 8px;background:var(--paper);border:1px solid var(--line-soft);border-radius:5px;font-size:12px;line-height:1.4;gap:10px;color:var(--text)}
+#tableDialog .select-trigger:hover,#tableDialog .select-trigger[aria-expanded=true]{background:var(--paper);border-color:var(--line)}#tableDialog .select-trigger svg{color:var(--muted)}
+.table-settings label>.select-control,.table-paste-controls label>.select-control{display:flex;margin-top:4px}.table-settings .select-trigger{min-width:160px}
+.table-settings input{background:var(--paper)}
+.table-settings button,.table-tools button,.table-paste-controls button{border-color:var(--line);color:var(--text)}.table-settings button:hover,.table-tools button:hover,.table-paste-controls button:hover{background:var(--hover);border-color:var(--accent)}
+.table-tabs button:focus-visible{outline:0;color:var(--text)}.table-tabs button:focus-visible:not([aria-selected=true]){border-bottom-color:var(--line)}
+.table-settings input[type=checkbox]{min-height:0;width:14px;height:14px;padding:0;background:var(--paper)}.table-settings input[type=checkbox]:checked{background:var(--accent)}
+.table-tabs button{border-radius:0}

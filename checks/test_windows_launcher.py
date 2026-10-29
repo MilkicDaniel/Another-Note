@@ -1,4 +1,5 @@
-import json,os,types,unittest
+import json,os,tempfile,types,unittest
+from pathlib import Path
 from unittest.mock import Mock,patch
 from windows import launcher
 
@@ -74,5 +75,30 @@ class WindowsInstanceTests(unittest.TestCase):
         self.instance.receive(self.app,Connection(request=[]));self.app.new_window.assert_called_once_with(ids=[]);self.editor.window.show.assert_not_called()
     def test_invalid_paths_do_not_import_or_show(self):
         request=self.request();request['paths']=[{}];self.instance.receive(self.app,Connection(request=request));self.editor.deliver_imports.assert_not_called();self.editor.window.show.assert_not_called()
+    def test_an_unreachable_running_app_is_reported_without_the_webview2_hint(self):
+        with patch.object(launcher,'Client',side_effect=FileNotFoundError()),patch.object(launcher.time,'sleep'),self.assertRaisesRegex(launcher.PrimaryUnavailable,'starting or closing'):
+            self.instance.forward([])
+
+class WindowsStartupTests(unittest.TestCase):
+    def setUp(self):self.folder=tempfile.TemporaryDirectory();self.addCleanup(self.folder.cleanup)
+    def run_main(self,instances,forward_error=None,webview_error=None):
+        platform=Mock();made=iter(instances)
+        for instance in instances:
+            if forward_error:instance.forward.side_effect=forward_error
+        webview=types.SimpleNamespace(settings={},start=Mock(side_effect=webview_error))
+        with patch.object(launcher,'os',types.SimpleNamespace(name='nt',environ=os.environ,open=os.open,fdopen=os.fdopen)),patch.object(launcher,'WindowsPlatform',return_value=platform),patch.object(launcher,'data_folder',return_value=Path(self.folder.name)),patch.object(launcher,'load_release',return_value={}),\
+             patch.object(launcher,'Instance',side_effect=lambda *args:next(made)),patch.object(launcher,'Application'),patch.object(launcher,'captured_launch_point',return_value=None),patch.object(launcher.time,'sleep'),\
+             patch.object(launcher.traceback,'format_exc',return_value=''),patch.dict('sys.modules',{'webview':webview}):
+            return launcher.main(),platform,webview
+    def test_a_launch_while_the_last_window_closes_waits_and_then_starts_normally(self):
+        closing=Mock(primary=False);closing.forward.side_effect=launcher.PrimaryUnavailable('closing');fresh=Mock(primary=True)
+        result,platform,webview=self.run_main([closing,fresh])
+        self.assertEqual(result,0);closing.close.assert_called();webview.start.assert_called_once();platform.message.assert_not_called()
+    def test_new_window_forwarding_errors_do_not_mention_webview2(self):
+        result,platform,webview=self.run_main([Mock(primary=False)],forward_error=RuntimeError('pipe failed'))
+        self.assertEqual(result,1);webview.start.assert_not_called();self.assertNotIn('WebView2',platform.message.call_args[0][0])
+    def test_webview_start_failures_still_mention_webview2(self):
+        result,platform,webview=self.run_main([Mock(primary=True)],webview_error=RuntimeError('no runtime'))
+        self.assertEqual(result,1);self.assertIn('WebView2',platform.message.call_args[0][0])
 
 if __name__=='__main__':unittest.main()

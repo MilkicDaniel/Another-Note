@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Launch Another Note in its native Fedora GTK4 / WebKit6 window."""
+import itertools
 import json
 import base64
 import math
 import os
 from pathlib import Path
+import re
 import sys
 import threading
 import uuid
@@ -15,6 +17,8 @@ from file_store import FileStore, VersionStore
 APP_ID = 'org.vistanotes.VistaNotes'
 APP_DIR = Path(__file__).resolve().parent
 MAX_IMPORT = 20 * 1024 * 1024
+HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}')
+header_classes = itertools.count(1)
 _x11_drag_connection = None
 
 
@@ -123,6 +127,21 @@ def follow_system_theme(Gtk, Gio):
     manager = Adw.StyleManager.get_default()
     manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
     return manager
+
+
+def use_app_color_scheme(system_theme, Gtk, setting):
+    """Follow the editor's Dark or Light choice so the title bar matches it during a light or dark desktop day.
+
+    A System setting keeps following the desktop; forcing it would also change the page's prefers-color-scheme."""
+    if hasattr(system_theme, 'set_color_scheme'):
+        from gi.repository import Adw
+        system_theme.set_color_scheme({'dark': Adw.ColorScheme.FORCE_DARK, 'light': Adw.ColorScheme.FORCE_LIGHT}.get(setting, Adw.ColorScheme.DEFAULT))
+        return
+    toolkit = Gtk.Settings.get_default()
+    if toolkit is not None and setting in ('light', 'dark'):
+        toolkit.set_property('gtk-application-prefer-dark-theme', setting == 'dark')
+    elif toolkit is not None and hasattr(system_theme, 'get_string'):
+        toolkit.set_property('gtk-application-prefer-dark-theme', system_theme.get_string('color-scheme') == 'prefer-dark')
 
 
 def run():
@@ -615,6 +634,8 @@ def run():
             self.controllers = []
             self.content_manager = None
             self.style_provider = None
+            self.header_provider = None
+            self.header_class = 'vista-notes-window-' + str(next(header_classes))
             self.disposed = False
             self.hub = application.hub
             self.store = application.store
@@ -642,9 +663,10 @@ def run():
             for controller in self.controllers: self.window.remove_controller(controller)
             self.controllers.clear()
             if self.view is not None: self.view.stop_loading()
-            if self.style_provider is not None:
-                Gtk.StyleContext.remove_provider_for_display(Gdk.Display.get_default(), self.style_provider)
-                self.style_provider = None
+            for provider in (self.style_provider, self.header_provider):
+                if provider is not None:
+                    Gtk.StyleContext.remove_provider_for_display(Gdk.Display.get_default(), provider)
+            self.style_provider = self.header_provider = None
 
         def activate_window(self, _app):
             if self.window:
@@ -681,6 +703,7 @@ def run():
             self.window.set_icon_name(APP_ID)
             header = Gtk.HeaderBar()
             header.add_css_class('vista-notes-header')
+            header.add_css_class(self.header_class)
             self.title_label = Gtk.Label(label='Another Note', ellipsize=Pango.EllipsizeMode.END, max_width_chars=65)
             header.set_title_widget(self.title_label)
             self.window.set_titlebar(header)
@@ -694,6 +717,30 @@ def run():
             color = Gdk.RGBA()
             color.parse('#000000' if theme == 'dark' else '#fcfcfc')
             self.view.set_background_color(color)
+
+        def set_appearance(self, data):
+            """Match the native title bar and GTK light/dark mode to the editor theme rather than the desktop."""
+            theme = data.get('theme')
+            if theme not in ('light', 'dark'):
+                raise ValueError('Invalid appearance.')
+            self.set_background(theme)
+            use_app_color_scheme(self.system_theme, Gtk, data.get('setting', 'system'))
+            chrome, text = data.get('chrome'), data.get('chromeText')
+            if not all(isinstance(value, str) and HEX_COLOR.fullmatch(value) for value in (chrome, text)):
+                return
+            css = ('headerbar.' + self.header_class + ' {background:' + chrome + ';color:' + text + ';box-shadow:inset 0 -1px alpha(' + text + ',.12);}'
+                   'headerbar.' + self.header_class + ':backdrop {background:' + chrome + ';color:alpha(' + text + ',.7);}'
+                   'headerbar.' + self.header_class + ' label {color:inherit;}')
+            provider = Gtk.CssProvider()
+            if hasattr(provider, 'load_from_string'):
+                provider.load_from_string(css)
+            else:
+                provider.load_from_data(css.encode())
+            display = Gdk.Display.get_default()
+            if self.header_provider is not None:
+                Gtk.StyleContext.remove_provider_for_display(display, self.header_provider)
+            Gtk.StyleContext.add_provider_for_display(display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self.header_provider = provider
 
         def cancel_startup_timeout(self):
             if self.startup_timeout:
@@ -814,14 +861,13 @@ def run():
                     if (self.transfer_origin or self.drag_preview_token) and data.get('failed'):
                         self.startup_failed('The file could not be loaded.')
                         return
+                    if data.get('theme') in ('light', 'dark'):
+                        self.set_appearance(data)
                     self.show_editor(data.get('theme', 'dark'))
                     self.reply(request_id, {'ready': True})
                     self.deliver_imports()
                 elif command == 'appearance':
-                    theme = data.get('theme')
-                    if theme not in ('light', 'dark'):
-                        raise ValueError('Invalid appearance.')
-                    self.set_background(theme)
+                    self.set_appearance(data)
                     self.reply(request_id, {'updated': True})
                 elif command == 'editor_bundle':
                     self.background(request_id, lambda: self.application.editor_bundles.read(data.get('bundle')))
