@@ -1,0 +1,56 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const root=path.join(__dirname,'..'),catalog=JSON.parse(fs.readFileSync(path.join(root,'source/vendor/editor-themes.json'),'utf8'));
+const context=vm.createContext({});
+vm.runInContext('const EditorThemePresets='+JSON.stringify(catalog)+';\n'+fs.readFileSync(path.join(root,'source/editor-style-config.js'),'utf8')+'\nglobalThis.style=EditorStyle;',context);
+const style=context.style,plain=value=>JSON.parse(JSON.stringify(value));
+assert.equal(catalog.length,16);assert.equal(new Set(catalog.map(t=>t.id)).size,16);
+assert.equal(catalog.filter(t=>t.mode==='dark').length,10);assert.equal(catalog.filter(t=>t.mode==='light').length,6);
+for(const theme of catalog){
+  assert.match(theme.sha256,/^[\da-f]{64}$/);assert.ok(theme.packageUrl.includes('/'+theme.version+'/'));
+  assert.deepEqual(Object.keys(theme.colors).sort(),plain(style.tokens.map(([key])=>key)).sort());
+  assert.deepEqual(Object.keys(theme.surfaces).sort(),plain(style.surfaceTokens.map(([key])=>key)).sort());
+  for(const value of [...Object.values(theme.colors),...Object.values(theme.surfaces)])assert.match(value,/^#[\da-f]{6}$/);
+  const applied=style.useTheme({},theme.mode,theme.id);
+  assert.equal(style.selectedTheme(applied,theme.mode).id,theme.id);
+  assert.deepEqual(plain(applied.appearance.colors[theme.mode]),theme.colors);
+  assert.deepEqual(plain(applied.appearance.surfaces[theme.mode]),theme.surfaces);
+}
+let preferences=style.useTheme({},'dark','dracula');preferences=style.useTheme(preferences,'light','atom-one-light');
+assert.equal(preferences.appearance.surfaces.dark.paper,'#282a36');assert.equal(preferences.appearance.colors.dark.keyword,'#ff79c6');
+assert.equal(preferences.appearance.surfaces.light.paper,'#fafafa');assert.equal(preferences.appearance.colors.light.keyword,'#a626a4');
+assert.equal(style.useTheme(preferences,'light','dracula').appearance.selectedThemes.light,'atom-one-light','Choosing an incompatible preset preserves the existing choice');
+const legacy=style.normalize({appearance:{colors:{dark:{keyword:'#123456'}},fontFamily:'Consolas'}});
+assert.equal(legacy.appearance.colors.dark.keyword,'#123456');assert.equal(legacy.appearance.selectedThemes.dark,'custom','Old custom colors are retained during migration');
+assert.equal(legacy.appearance.selectedThemes.light,'default-light');assert.equal(legacy.appearance.fontFamily,'Consolas');
+const invalid=style.normalize({appearance:{surfaces:{dark:{paper:'url(https://invalid.example)',accent:'#abcdef'}}},customThemes:JSON.parse('{"__proto__":{"name":"bad","mode":"dark"},"custom-valid":{"name":"  Work\\u0000 theme  ","mode":"light","colors":{"keyword":"#ABCDEF"},"surfaces":{"paper":"#FDFDFD"}}}')});
+assert.equal(Object.keys(invalid.customThemes).length,1);assert.equal(invalid.customThemes['custom-valid'].name,'Work theme');
+assert.equal(invalid.customThemes['custom-valid'].surfaces.paper,'#fdfdfd');assert.equal(invalid.appearance.surfaces.dark.paper,style.surfaces.dark.paper);
+assert.equal(invalid.appearance.surfaces.dark.accent,'#abcdef');
+preferences.customThemes['custom-work']={name:'Work',mode:'dark',colors:{...preferences.appearance.colors.dark},surfaces:{...preferences.appearance.surfaces.dark}};
+preferences=style.useTheme(preferences,'dark','custom-work');
+assert.equal(style.normalize(JSON.parse(JSON.stringify(preferences))).appearance.selectedThemes.dark,'custom-work','Saved themes and both mode choices round-trip through recovery data');
+preferences.appearance.surfaces.dark.paper='#123456';assert.equal(style.selectedTheme(preferences,'dark'),null,'Editing a chosen theme does not silently change the saved theme');
+assert.equal(preferences.customThemes['custom-work'].surfaces.paper,'#282a36');
+assert.equal(catalog.find(t=>t.id==='dracula').surfaces.paper,'#282a36','Editing a theme cannot mutate bundled presets');
+
+vm.runInContext(fs.readFileSync(path.join(root,'source/editor-preferences.js'),'utf8'),context);
+const base=style.normalize(preferences),draft=style.normalize(base),current=style.normalize(base);
+delete draft.customThemes['custom-work'];current.customThemes['custom-other']={name:'Other',mode:'light',colors:{...style.palettes.light},surfaces:{...style.surfaces.light}};
+draft.appearance.colors.dark.number='#0a0b0c';current.appearance.colors.light.keyword='#010203';
+const merged=style.normalize(context.mergePreferenceDraft(base,draft,current));
+assert.equal(merged.customThemes['custom-work'],undefined,'Deletion in an open dialog survives Apply');assert.ok(merged.customThemes['custom-other'],'A theme created in another window is preserved');
+assert.equal(merged.appearance.colors.light.keyword,'#010203');assert.equal(merged.appearance.colors.dark.number,'#0a0b0c');
+
+const elements=new Map();context.$=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',innerHTML:'',disabled:false,focus(){},reportValidity:()=>true});return elements.get(id);};
+let serial=0;context.uid=()=>String(++serial);context.escape=value=>String(value).replaceAll('<','&lt;').replaceAll('>','&gt;');
+context.draft=style.useTheme({},'dark','nord');vm.runInContext('editorPreferencesDraft=draft;',context);
+context.$('preferencesPalette').value='dark';context.$('preferencesThemeName').value='My <Nord>';
+assert.equal(context.savePreferenceTheme(),true);let snapshot=vm.runInContext('EditorStyle.normalize(editorPreferencesDraft)',context);
+assert.equal(snapshot.appearance.selectedThemes.dark,'custom-1');assert.equal(snapshot.customThemes['custom-1'].name,'My <Nord>');
+assert.match(context.$('preferencesThemeDark').innerHTML,/My &lt;Nord&gt;/,'User theme names are escaped in the selector');
+context.$('preferencesThemeName').value='MY <NORD>';assert.equal(context.savePreferenceTheme(),false,'Save as prevents duplicate names within a mode');
+vm.runInContext('editorPreferencesDraft.appearance.colors.dark.keyword="#102030";',context);
+context.$('preferencesThemeName').value='Updated Nord';assert.equal(context.savePreferenceTheme(true),true);
+snapshot=vm.runInContext('EditorStyle.normalize(editorPreferencesDraft)',context);assert.equal(snapshot.customThemes['custom-1'].colors.keyword,'#102030');assert.equal(snapshot.customThemes['custom-1'].name,'Updated Nord');
+context.deletePreferenceTheme();snapshot=vm.runInContext('EditorStyle.normalize(editorPreferencesDraft)',context);assert.equal(Object.keys(snapshot.customThemes).length,0);assert.equal(snapshot.appearance.colors.dark.keyword,'#102030','Deleting a saved theme keeps the active colors');
+console.log('Passed: all 16 source palettes, independent mode assignments, legacy colors, validated custom themes, save/update/delete, persistence, escaped names and concurrent library edits.');

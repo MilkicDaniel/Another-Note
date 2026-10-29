@@ -14,19 +14,57 @@
   function applyEditorAppearance(theme){
     const appearance=editorPreferenceAppearance(),style=document.documentElement.style;
     style.setProperty('--editor-font',EditorStyle.font(appearance));style.setProperty('--editor-font-weight',appearance.fontStyle.includes('bold')?'700':'400');style.setProperty('--editor-font-style',appearance.fontStyle.includes('italic')?'italic':'normal');
+    for(const [key]of EditorStyle.surfaceTokens)document.body.style.setProperty('--'+key,appearance.surfaces[theme][key]);
     for(const [key]of EditorStyle.tokens)document.body.style.setProperty('--syntax-'+key,appearance.colors[theme][key]);
+    for(const [key,token]of [['comment','comment'],['string','string'],['key','property'],['number','number'],['keyword','keyword'],['variable','variable']])document.body.style.setProperty('--'+key,appearance.colors[theme][token]);
+    document.documentElement.style.backgroundColor=appearance.surfaces[theme].paper;
     if(typeof minimapPaintKey!=='undefined')minimapPaintKey=null;
     return appearance.lineHeight;
   }
   function mergePreferenceDraft(base,draft,current){
     if(JSON.stringify(base)===JSON.stringify(draft))return current;
     if(!draft||typeof draft!=='object'||Array.isArray(draft))return draft;
-    const result={...current};for(const key of Object.keys(draft))result[key]=mergePreferenceDraft(base?.[key],draft[key],current?.[key]);return result;
+    const result={...current};for(const key of Object.keys(base||{}))if(!Object.hasOwn(draft,key))delete result[key];
+    for(const key of Object.keys(draft))result[key]=mergePreferenceDraft(base?.[key],draft[key],current?.[key]);return result;
   }
   function preferenceOptions(values,selected){return values.map(([value,label])=>`<option value="${escape(value)}"${String(value)===String(selected)?' selected':''}>${escape(label)}</option>`).join('');}
   function renderPreferenceColors(){
-    const theme=$('preferencesPalette').value,colors=editorPreferencesDraft.appearance.colors[theme];
-    $('preferencesColors').innerHTML=EditorStyle.tokens.map(([key,label])=>`<div class="preference-color-row"><label for="preferenceColor-${key}">${label}</label><input id="preferenceColor-${key}" type="color" value="${colors[key]}" data-syntax-color="${key}" aria-label="${label} color"><input type="text" value="${colors[key]}" data-syntax-hex="${key}" aria-label="${label} hex color" pattern="#[0-9a-fA-F]{6}" maxlength="7" spellcheck="false" required></div>`).join('');
+    const mode=$('preferencesPalette').value,appearance=editorPreferencesDraft.appearance;
+    for(const [kind,fields,colors,target]of [['syntax',EditorStyle.tokens,appearance.colors[mode],'preferencesColors'],['surface',EditorStyle.surfaceTokens,appearance.surfaces[mode],'preferencesSurfaceColors']]){
+      $(target).innerHTML=fields.map(([key,label])=>`<div class="preference-color-row"><label for="preferenceColor-${kind}-${key}">${label}</label><input id="preferenceColor-${kind}-${key}" type="color" value="${colors[key]}" data-${kind}-color="${key}" aria-label="${label} color"><input type="text" value="${colors[key]}" data-${kind}-hex="${key}" aria-label="${label} hex color" pattern="#[0-9a-fA-F]{6}" maxlength="7" spellcheck="false" required></div>`).join('');
+    }
+    renderPreferenceThemes();
+  }
+  function renderPreferenceThemes(){
+    const draft=editorPreferencesDraft,mode=$('preferencesPalette').value;
+    for(const [key,id]of [['dark','preferencesThemeDark'],['light','preferencesThemeLight']]){
+      const themes=EditorStyle.availableThemes(draft,key),selected=draft.appearance.selectedThemes[key],found=themes.find(theme=>theme.id===selected),unchanged=EditorStyle.selectedTheme(draft,key);
+      const options=items=>preferenceOptions(items.map(theme=>[theme.id,theme.name+(theme.id===selected&&!unchanged?' (modified)':'')]),selected);
+      $(id).innerHTML=(!found?'<option value="custom" selected>Custom colors (unsaved theme)</option>':'')+'<optgroup label="Built-in themes">'+options(themes.filter(theme=>!theme.id.startsWith('custom-')))+'</optgroup>'+(themes.some(theme=>theme.id.startsWith('custom-'))?'<optgroup label="My themes">'+options(themes.filter(theme=>theme.id.startsWith('custom-')))+'</optgroup>':'');
+    }
+    const id=draft.appearance.selectedThemes[mode],saved=draft.customThemes[id],preset=EditorStyle.presets.find(theme=>theme.id===id);
+    $('preferencesUpdateTheme').disabled=!saved;$('preferencesDeleteTheme').disabled=!saved;
+    $('preferencesThemeSource').textContent=preset?preset.name+' · '+(typeof preset.author==='object'?preset.author.name:preset.author||preset.extension):saved?'Saved theme for '+mode+' mode.':'Customize the colors below, then save a named theme to use again.';
+  }
+  function setPreferenceTheme(mode,id){
+    editorPreferencesDraft=EditorStyle.useTheme(editorPreferencesDraft,mode,id);$('preferencesPalette').value=mode;
+    $('preferencesThemeName').value=editorPreferencesDraft.customThemes[id]?.name||'';$('preferencesThemeStatus').textContent='';
+    renderPreferenceColors();schedulePreferencesPreview();
+  }
+  function savePreferenceTheme(update=false){
+    if(!editorPreferencesDraft||!$('editorPreferencesForm').reportValidity())return false;
+    const name=EditorStyle.themeName($('preferencesThemeName').value),mode=$('preferencesPalette').value,draft=editorPreferencesDraft;
+    if(!name){$('preferencesThemeStatus').textContent='Enter a name for your theme.';$('preferencesThemeName').focus();return false;}
+    const previous=draft.appearance.selectedThemes[mode],id=update?previous:'custom-'+uid();
+    if(update&&!draft.customThemes[id])return false;
+    if(Object.entries(draft.customThemes).some(([key,theme])=>key!==id&&theme.mode===mode&&theme.name.toLowerCase()===name.toLowerCase())){$('preferencesThemeStatus').textContent='A theme with this name already exists for '+mode+' mode. Choose another name, or select it and use Update saved theme.';return false;}
+    if(!update&&Object.keys(draft.customThemes).length>=100){$('preferencesThemeStatus').textContent='You have 100 saved themes. Delete a saved theme before adding another.';return false;}
+    draft.customThemes[id]={name,mode,colors:{...draft.appearance.colors[mode]},surfaces:{...draft.appearance.surfaces[mode]}};draft.appearance.selectedThemes[mode]=id;
+    $('preferencesThemeName').value=name;renderPreferenceThemes();$('preferencesThemeStatus').textContent='Theme '+(update?'updated':'saved')+' in this preview. Apply to keep it.';return true;
+  }
+  function deletePreferenceTheme(){
+    const mode=$('preferencesPalette').value,id=editorPreferencesDraft.appearance.selectedThemes[mode];if(!editorPreferencesDraft.customThemes[id])return;
+    delete editorPreferencesDraft.customThemes[id];editorPreferencesDraft.appearance.selectedThemes[mode]='custom';$('preferencesThemeName').value='';renderPreferenceThemes();$('preferencesThemeStatus').textContent='Removed from My themes. Apply to keep this change; the current colors are retained.';
   }
   function formatPreferenceField(key,label,values){
     const value=editorPreferencesDraft.formatting[$('preferencesLanguage').value][key];
@@ -81,6 +119,7 @@
     if(!ready||startupBlocked)return;
     closeMenus();preferencesSection=section;editorPreferencesBase=EditorStyle.normalize(state.settings.editorPreferences);editorPreferencesDraft=EditorStyle.normalize(editorPreferencesBase);editorPreferencesSize=editorPreferencesBaseSize=state.settings.fontSize;
     $('preferencesPalette').value=document.body.dataset.theme||'dark';$('preferencesLanguage').value=note()?.mode||'javascript';$('preferencesMessage').textContent='';
+    $('preferencesThemeName').value=editorPreferencesDraft.customThemes[editorPreferencesDraft.appearance.selectedThemes[$('preferencesPalette').value]]?.name||'';$('preferencesThemeStatus').textContent='';
     renderEditorPreferences();$('editorPreferencesDialog').showModal();$('preferencesAppearanceTab').focus();
   }
   function previewPreferenceCode(text){$('preferencesPreviewCode').innerHTML=colorCode(text,$('preferencesLanguage').value);}
@@ -89,6 +128,9 @@
     clearTimeout(preferencesPreviewTimer);const sequence=++preferencesPreviewSequence,mode=$('preferencesLanguage').value,theme=$('preferencesPalette').value,appearance=editorPreferencesDraft.appearance,preview=$('preferencesPreview');
     preview.style.fontFamily=EditorStyle.font(appearance);preview.style.fontSize=editorPreferencesSize+'px';preview.style.lineHeight=Math.round(editorPreferencesSize*appearance.lineHeight)+'px';preview.style.fontWeight=appearance.fontStyle.includes('bold')?'700':'400';preview.style.fontStyle=appearance.fontStyle.includes('italic')?'italic':'normal';preview.style.tabSize=String(editorTabSize());preview.dataset.previewTheme=theme;preview.scrollTop=0;preview.scrollLeft=0;
     for(const [key]of EditorStyle.tokens)preview.style.setProperty('--syntax-'+key,appearance.colors[theme][key]);
+    const frame=$('preferencesThemePreview');frame.dataset.previewTheme=theme;frame.style.colorScheme=theme;
+    for(const [key]of EditorStyle.surfaceTokens)frame.style.setProperty('--'+key,appearance.surfaces[theme][key]);
+    $('preferencesPreviewTab').textContent='sample.'+({javascript:'js',python:'py',bash:'sh',markdown:'md',text:'txt'}[mode]||mode);
     const source=preferenceSamples[mode];previewPreferenceCode(source);$('preferencesPreviewStatus').textContent=preferencesSection==='formatting'?'Updating preview…':'Sample preview';
     if(preferencesSection!=='formatting')return;
     const preferences=EditorStyle.profile(editorPreferencesDraft,mode,editorTabSize());
@@ -112,21 +154,23 @@
     const dialog=$('editorPreferencesDialog');
     $('editorPreferencesForm').addEventListener('submit',event=>{event.preventDefault();applyEditorPreferences().catch(error=>$('preferencesMessage').textContent=error.message);});
     for(const id of ['preferencesCancel','preferencesClose'])$(id).addEventListener('click',()=>dialog.close());
-    dialog.addEventListener('close',()=>{clearTimeout(preferencesPreviewTimer);preferencesPreviewSequence++;editorPreferencesDraft=null;editorPreferencesBase=null;editor.focus();});
+    dialog.addEventListener('close',()=>{if(dialog.open)return;clearTimeout(preferencesPreviewTimer);preferencesPreviewSequence++;editorPreferencesDraft=null;editorPreferencesBase=null;editor.focus();});
     dialog.addEventListener('click',event=>{
       const tab=event.target.closest('[data-preferences-section]');if(tab){preferencesSection=tab.dataset.preferencesSection;renderEditorPreferences();}
     });
     $('preferencesTabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();preferencesSection=event.key==='Home'?'appearance':event.key==='End'?'formatting':preferencesSection==='appearance'?'formatting':'appearance';renderEditorPreferences();$(preferencesSection==='appearance'?'preferencesAppearanceTab':'preferencesFormattingTab').focus();});
     $('preferencesLanguage').addEventListener('change',()=>{renderFormatPreferences();schedulePreferencesPreview();});
-    $('preferencesPalette').addEventListener('change',()=>{renderPreferenceColors();schedulePreferencesPreview();});
-    $('preferencesColors').addEventListener('input',event=>{
-      const key=event.target.dataset.syntaxColor||event.target.dataset.syntaxHex;if(!key||!/^#[\da-f]{6}$/i.test(event.target.value))return;
-      const value=event.target.value.toLowerCase();editorPreferencesDraft.appearance.colors[$('preferencesPalette').value][key]=value;
-      $('preferencesColors').querySelector(`[data-syntax-color="${key}"]`).value=value;$('preferencesColors').querySelector(`[data-syntax-hex="${key}"]`).value=value;schedulePreferencesPreview();
+    $('preferencesPalette').addEventListener('change',()=>{const mode=$('preferencesPalette').value;$('preferencesThemeName').value=editorPreferencesDraft.customThemes[editorPreferencesDraft.appearance.selectedThemes[mode]]?.name||'';$('preferencesThemeStatus').textContent='';renderPreferenceColors();schedulePreferencesPreview();});
+    for(const [mode,id]of [['light','preferencesThemeLight'],['dark','preferencesThemeDark']])$(id).addEventListener('change',event=>setPreferenceTheme(mode,event.target.value));
+    $('preferencesSaveTheme').addEventListener('click',()=>savePreferenceTheme());$('preferencesUpdateTheme').addEventListener('click',()=>savePreferenceTheme(true));$('preferencesDeleteTheme').addEventListener('click',deletePreferenceTheme);
+    for(const [kind,id,field]of [['syntax','preferencesColors','colors'],['surface','preferencesSurfaceColors','surfaces']])$(id).addEventListener('input',event=>{
+      const key=event.target.dataset[kind+'Color']||event.target.dataset[kind+'Hex'];if(!key||!/^#[\da-f]{6}$/i.test(event.target.value))return;
+      const value=event.target.value.toLowerCase();editorPreferencesDraft.appearance[field][$('preferencesPalette').value][key]=value;
+      $(id).querySelector(`[data-${kind}-color="${key}"]`).value=value;$(id).querySelector(`[data-${kind}-hex="${key}"]`).value=value;renderPreferenceThemes();schedulePreferencesPreview();
     });
-    $('preferencesResetPalette').addEventListener('click',()=>{const theme=$('preferencesPalette').value;editorPreferencesDraft.appearance.colors[theme]={...EditorStyle.palettes[theme]};renderPreferenceColors();schedulePreferencesPreview();});
+    $('preferencesResetPalette').addEventListener('click',()=>setPreferenceTheme($('preferencesPalette').value,'default-'+$('preferencesPalette').value));
     $('preferencesResetFormat').addEventListener('click',()=>{const mode=$('preferencesLanguage').value;editorPreferencesDraft.formatting[mode]=EditorStyle.normalize().formatting[mode];renderFormatPreferences();schedulePreferencesPreview();});
-    $('preferencesResetAll').addEventListener('click',()=>{editorPreferencesDraft=EditorStyle.normalize();editorPreferencesSize=15;renderEditorPreferences();});
+    $('preferencesResetAll').addEventListener('click',()=>{const customThemes=editorPreferencesDraft.customThemes;editorPreferencesDraft=EditorStyle.normalize({customThemes});editorPreferencesSize=15;$('preferencesThemeName').value='';$('preferencesThemeStatus').textContent='Default appearance and formatting restored. My themes are kept. Apply to keep these changes.';renderEditorPreferences();});
     $('preferencesFontFamily').addEventListener('input',event=>{editorPreferencesDraft.appearance.fontFamily=event.target.value.trim().slice(0,100);schedulePreferencesPreview();});
     $('preferencesFontStyle').addEventListener('change',event=>{editorPreferencesDraft.appearance.fontStyle=event.target.value;schedulePreferencesPreview();});
     $('preferencesFontSize').addEventListener('input',event=>{if(event.target.validity.valid){editorPreferencesSize=Number(event.target.value);schedulePreferencesPreview();}});

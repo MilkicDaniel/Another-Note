@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(path.join(__dirname,'../source/file-features.js'),'utf8');
 let serial=0;const disk=new Map(),calls=[],dialog={open:false},messages=[];
-const c=vm.createContext({native:true,startupBlocked:false,MODES:{text:'Plain Text'},$:()=>dialog,uid:()=>`v${++serial}`,clock:()=>serial,toast:message=>messages.push(message),
+const c=vm.createContext({native:true,startupBlocked:false,state:{notes:[]},MODES:{text:'Plain Text'},$:()=>dialog,uid:()=>`v${++serial}`,clock:()=>serial,toast:message=>messages.push(message),
  request:async(command,args)=>{
    calls.push({command,args});
    if(command==='versions_append'){
@@ -16,6 +16,7 @@ const c=vm.createContext({native:true,startupBlocked:false,MODES:{text:'Plain Te
 const cache=vm.runInContext('versionCache',c),queues=vm.runInContext('versionQueues',c),errors=vm.runInContext('versionErrors',c);
 (async()=>{
   const file={id:'a',title:'a.txt',content:'first',mode:'text'};
+  c.state.notes.push(file);
   await c.checkpointVersion(file,'Saved',true);file.content='second';await c.checkpointVersion(file,'Saved',true);
   assert.deepEqual(calls.map(call=>call.command),['versions_append','versions_append'],'Automatic checkpoints send one new version without loading all past contents');
   assert.ok(calls.every(call=>!('versions' in call.args)));assert.equal(cache.size,0);assert.equal(queues.size,0,'Settled queues release their references');assert.equal(disk.get('a').length,2);

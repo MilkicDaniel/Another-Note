@@ -692,7 +692,7 @@ def run():
 
         def set_background(self, theme):
             color = Gdk.RGBA()
-            color.parse('#191e23' if theme == 'dark' else '#fcfcfc')
+            color.parse('#000000' if theme == 'dark' else '#fcfcfc')
             self.view.set_background_color(color)
 
         def cancel_startup_timeout(self):
@@ -788,7 +788,8 @@ def run():
                     raise ValueError('Invalid request identity.')
                 if command == 'load':
                     def load():
-                        result = self.hub.load(self.window_id, self.initial_ids)
+                        result = self.hub.load(self.window_id, self.initial_ids,
+                                               open_tabs_only=data.get('deferClosed') is True and not self.transfer)
                         self.initial_ids = None
                         result['windowId'] = self.window_id
                         result['historyAppend'] = True
@@ -799,6 +800,16 @@ def run():
                         self.transfer = None
                         return result
                     self.background(request_id, load)
+                elif command == 'load_remaining':
+                    def load_remaining():
+                        result = self.hub.load(self.window_id)
+                        result['openIds'] = self.hub.open_file_ids()
+                        return result
+                    self.background(request_id, load_remaining)
+                elif command == 'open_file_link':
+                    self.background(request_id, lambda: self.hub.open_file_link(self.window_id, data.get('fileId')))
+                elif command == 'read_file_link':
+                    self.background(request_id, lambda: self.hub.open_file_link(self.window_id, data.get('fileId'), activate=False))
                 elif command == 'ready':
                     if (self.transfer_origin or self.drag_preview_token) and data.get('failed'):
                         self.startup_failed('The file could not be loaded.')
@@ -819,7 +830,8 @@ def run():
                     def save():
                         snapshot = self.hub.save(self.window_id, state)
                         GLib.idle_add(self.application.workspace_saved, self, snapshot, priority=GLib.PRIORITY_DEFAULT)
-                        return {'saved': True, 'openIds': snapshot['settings']['openIds']}
+                        return {'saved': True, 'openIds': snapshot['settings']['openIds'],
+                                'fileLinks': [note for note in snapshot['notes'] if note.get('fileLink')]}
                     self.background(request_id, save)
                 elif command == 'open_tabs':
                     self.background(request_id, lambda: {'openIds': self.hub.open_file_ids()})
@@ -912,15 +924,15 @@ def run():
                         dialog.save(self.window, None, chosen_file)
                 elif command == 'versions_load':
                     file_id = data.get('fileId')
-                    self.background(request_id, lambda: {'versions': self.versions.read(file_id)})
+                    self.background(request_id, lambda: {'versions': self.hub.version_operation('read', file_id, epoch=data.get('historyEpoch', 0))})
                 elif command == 'versions_store':
                     file_id, versions = data.get('fileId'), data.get('versions')
-                    self.background(request_id, lambda: self.versions.write(file_id, versions))
+                    self.background(request_id, lambda: self.hub.version_operation('write', file_id, versions, epoch=data.get('historyEpoch', 0)))
                 elif command == 'versions_append':
-                    self.background(request_id, lambda: self.versions.append(data.get('fileId'), data.get('version')))
+                    self.background(request_id, lambda: self.hub.version_operation('append', data.get('fileId'), data.get('version'), epoch=data.get('historyEpoch', 0)))
                 elif command == 'versions_delete':
                     file_id = data.get('fileId')
-                    self.background(request_id, lambda: self.versions.delete(file_id))
+                    self.background(request_id, lambda: self.hub.version_operation('delete', file_id))
                 elif command == 'export':
                     name, content = data.get('name'), data.get('text')
                     if not isinstance(name, str) or not isinstance(content, str):
@@ -1128,9 +1140,9 @@ def run():
             super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
             data_home = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
             self.store = NotebookStore(data_home / 'vista-notes' / 'notebook')
-            self.hub = WorkspaceHub(self.store)
             self.files = FileStore(self.store.folder)
             self.versions = VersionStore(self.store.folder)
+            self.hub = WorkspaceHub(self.store, self.files, self.versions)
             self.editor_bundles = EditorBundles(APP_DIR)
             self.editors = {}
             self.transfers = {}

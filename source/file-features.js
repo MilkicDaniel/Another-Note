@@ -99,6 +99,7 @@
     return result;
   }
   async function readVersionHistory(id,refresh=false){
+    const source=state.notes.find(file=>file.id===id),epoch=source?.historyEpoch||0;if(source?.fileLink)return [];
     const cached=refresh?versionCache.get(id):null;
     if(refresh)versionCache.delete(id);
     if(versionCache.has(id)){const versions=versionCache.get(id);versionCache.delete(id);versionCache.set(id,versions);return versions;}
@@ -106,11 +107,12 @@
     const load=(async()=>{
       try{
         let versions;
-        if(native)versions=(await request('versions_load',{fileId:id})).versions;
+        if(native)versions=(await request('versions_load',{fileId:id,historyEpoch:epoch})).versions;
         else{
           let local=[];try{local=JSON.parse(localStorage.getItem(`${KEY}.versions.${encodeURIComponent(id)}`)||'[]');}catch(_){}
           if(database)versions=[...(await databaseItem('fileVersions',id)||[]),...local];else versions=local;
         }
+        if(state.notes.find(file=>file.id===id)?.fileLink||(state.notes.find(file=>file.id===id)?.historyEpoch||0)!==epoch)return [];
         const result=trimVersions([...(versions||[]),...(versionErrors.has(id)?cached||[]:[])]);versionCache.set(id,result);return result;
       }catch(error){
         if(cached){versionCache.set(id,cached);toast('Could not refresh version history. Previously loaded checkpoints were kept.');return cached;}
@@ -119,8 +121,8 @@
     })();versionLoads.set(id,load);
     try{return await load;}finally{versionLoads.delete(id);trimVersionMemoryCache();}
   }
-  async function writeVersionHistory(id,versions){
-    if(native){const stored=await request('versions_store',{fileId:id,versions});return trimVersions(stored.versions||versions);}
+  async function writeVersionHistory(id,versions,epoch=state.notes.find(file=>file.id===id)?.historyEpoch||0){
+    if(native){const stored=await request('versions_store',{fileId:id,versions,historyEpoch:epoch});return trimVersions(stored.versions||versions);}
     const key=`${KEY}.versions.${encodeURIComponent(id)}`;let merged=versions,localText=null,local=[];
     try{localText=localStorage.getItem(key);local=normalizeVersions(JSON.parse(localText||'[]'));}catch(_){}
     const writeLocal=()=>{
@@ -140,19 +142,20 @@
     return writeLocal();
   }
   function enqueueVersions(id,transform,checkpoint=null){
+    const epoch=state.notes.find(file=>file.id===id)?.historyEpoch||0;
     const task=(versionQueues.get(id)||Promise.resolve()).catch(()=>{}).then(async()=>{
       if(native&&nativeHistoryAppend&&checkpoint&&!$('historyDialog').open&&!versionErrors.has(id)){
-        try{await request('versions_append',{fileId:id,version:checkpoint});versionCache.delete(id);return true;}
+        try{await request('versions_append',{fileId:id,version:checkpoint,historyEpoch:epoch});versionCache.delete(id);return true;}
         catch(error){versionCache.set(id,trimVersions([...(versionCache.get(id)||[]),checkpoint]));throw error;}
       }
       const before=await readVersionHistory(id),next=trimVersions(transform(before.slice()));
       if(!versionErrors.has(id)&&next.length===before.length&&next.every((item,i)=>item.id===before[i].id))return true;
-      versionCache.set(id,next);const stored=await writeVersionHistory(id,next);versionCache.set(id,stored);versionErrors.delete(id);return true;
+      versionCache.set(id,next);const stored=await writeVersionHistory(id,next,epoch);versionCache.set(id,stored);versionErrors.delete(id);return true;
     }).catch(error=>{if(!versionErrors.has(id))toast(`Version history could not be saved. ${error.message}`);versionErrors.set(id,error.message);return false;});
     versionQueues.set(id,task);task.then(()=>{if(versionQueues.get(id)===task)versionQueues.delete(id);trimVersionMemoryCache();});return task;
   }
   function checkpointVersion(file,reason='Checkpoint',force=false){
-    if(!file||file.removedAt||startupBlocked)return Promise.resolve(false);
+    if(!file||file.fileLink||file.removedAt||startupBlocked)return Promise.resolve(false);
     const now=Date.now(),previous=versionCheckpoints.get(file.id)||0;
     if(!force&&now-previous<30000)return Promise.resolve(true);
     versionCheckpoints.set(file.id,now);
@@ -180,7 +183,7 @@
   async function backup(){
     try{await flushVersionHistory();}catch(_){}
     const now=new Date(),notes=[];
-    for(const file of state.notes){const copy={...file};delete copy.fileKey;delete copy.diskPath;delete copy.folderKey;delete copy.folderPath;try{copy.versions=await readVersionHistory(file.id,true);}catch(_){copy.versions=[];}notes.push(copy);}
+    for(const file of state.notes){const copy={...(file.fileLink?await readFileLink(file):file)};delete copy.fileKey;delete copy.diskPath;delete copy.folderKey;delete copy.folderPath;try{copy.versions=await readVersionHistory(file.id,true);}catch(_){copy.versions=[];}notes.push(copy);}
     const ok=await download(`Another-Note-Backup-${now.toISOString().slice(0,10)}.json`,JSON.stringify({...state,notes,exportedAt:now.toISOString()},null,2),'application/json');
     if(ok){lastBackup=now.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});$('backupTime').textContent=`Backup exported ${lastBackup}`;toast('All files and available version history exported.');}
   }

@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import copy
 import threading
+import time
 
 MAX_BYTES = 64 * 1024 * 1024
 MODES = {'markdown', 'bash', 'json', 'java', 'javascript', 'html', 'css', 'python', 'text'}
@@ -82,7 +83,11 @@ def validate(state):
         if not isinstance(identity, str) or not identity or identity in seen:
             raise ValueError('Invalid or duplicate file identity.')
         seen.add(identity)
-        if not isinstance(note.get('title'), str) or not isinstance(note.get('content'), str) or note.get('mode') not in MODES:
+        linked = note.get('fileLink') is True
+        if (not isinstance(note.get('title'), str) or note.get('mode') not in MODES
+                or (not linked and not isinstance(note.get('content'), str))
+                or (linked and (not isinstance(note.get('fileKey'), str) or not note['fileKey']
+                                or not isinstance(note.get('diskPath'), str)))):
             raise ValueError('Invalid file text or format.')
         for key in ('createdAt', 'updatedAt'):
             value = note.get(key)
@@ -166,8 +171,9 @@ class NotebookStore:
 
 class WorkspaceHub:
     """Merge window journals atomically; each window owns its own tab order."""
-    def __init__(self, store):
+    def __init__(self, store, files=None, versions=None):
         self.store = store
+        self.files, self.versions = files, versions
         self.lock = threading.RLock()
         self.state = None
         self.opened = False
@@ -176,18 +182,107 @@ class WorkspaceHub:
         self.tag_filters = {}
         self.retired = set()
 
-    def load(self, window_id, open_ids=None):
+    def compact_closed(self, state, opened):
+        """Replace clean disk-backed closed documents with reopening links."""
+        if self.files is None or state is None:
+            return []
+        changed = []
+        for index, note in enumerate(state['notes']):
+            if note['id'] in opened or note.get('fileLink') or note.get('trashedAt') or note.get('removedAt'):
+                continue
+            saved = note.get('savedState')
+            if not note.get('fileKey') or not isinstance(saved, dict):
+                continue
+            if any(note.get(key) != saved.get(key) for key in ('title', 'content', 'mode')):
+                continue
+            if note.get('lineEnding', 'lf') != saved.get('lineEnding', 'lf') or bool(note.get('bom')) != bool(saved.get('bom')):
+                continue
+            try:
+                binding = self.files.binding(note['fileKey'])
+                if not binding or not Path(binding['path']).is_file():
+                    continue
+                with Path(binding['path']).open('rb'):
+                    pass
+            except (OSError, ValueError):
+                continue  # Keep the recovery text when its disk file is unavailable.
+            stamp = max(state.get('updatedAt', 0), note['updatedAt']) + 1
+            state['notes'][index] = dict(id=note['id'], title=Path(binding['path']).name,
+                                         fileKey=note['fileKey'], diskPath=binding['path'],
+                                         mode=note['mode'], createdAt=note['createdAt'],
+                                         updatedAt=stamp, fileLink=True)
+            changed.append(note['id'])
+        return changed
+
+    def delete_closed_history(self, identities):
+        if self.versions is not None:
+            for identity in identities:
+                self.versions.delete(identity)
+
+    def open_file_link(self, window_id, identity, *, activate=True):
+        with self.lock:
+            if window_id in self.retired or not self.opened:
+                raise ValueError('That editor window has closed.')
+            note = next((item for item in (self.state or {}).get('notes', []) if item['id'] == identity), None)
+            if note is None or note.get('removedAt') or note.get('trashedAt'):
+                raise ValueError('That file is no longer available.')
+            if note.get('fileLink'):
+                disk = self.files.read_bound(note['fileKey'])
+                if activate:
+                    self.delete_closed_history([identity])
+                text = disk['text'].replace('\r\n', '\n').replace('\r', '\n')
+                stamp = max(int(time.time() * 1000), self.state.get('updatedAt', 0) + 1, note['updatedAt'] + 1)
+                restored = dict(id=identity, title=disk['name'], content=text, mode=note['mode'],
+                                createdAt=note['createdAt'], updatedAt=stamp, fileKey=disk['fileKey'],
+                                diskPath=disk['diskPath'], lineEnding=disk['lineEnding'], bom=disk['bom'],
+                                historyEpoch=note['updatedAt'], hasSavedFile=True)
+                restored['savedState'] = {key: restored[key] for key in ('title', 'content', 'mode', 'lineEnding', 'bom')}
+                state = copy.deepcopy(self.state)
+                state['notes'] = [restored if item['id'] == identity else item for item in state['notes']]
+                state['updatedAt'] = stamp
+            else:
+                # An open sibling window owns the current draft. Reuse it
+                # instead of replacing its edits with a new disk read.
+                restored, state = note, copy.deepcopy(self.state)
+            if not activate:
+                return {'file': copy.deepcopy(restored), 'openIds': self.open_file_ids()}
+            tabs = {**self.tabs, window_id: list(dict.fromkeys([*self.tabs.get(window_id, []), identity]))}
+            state['settings']['openIds'] = list(dict.fromkeys(item for ids in tabs.values() for item in ids))
+            self.store.write(state)
+            self.state, self.tabs = state, tabs
+            return {'file': copy.deepcopy(restored), 'openIds': self.open_file_ids()}
+
+    def version_operation(self, operation, identity, *args, epoch=0):
+        with self.lock:
+            note = next((item for item in (self.state or {}).get('notes', []) if item['id'] == identity), None)
+            if operation != 'delete' and note and (note.get('fileLink') or note.get('historyEpoch', 0) != epoch):
+                return [] if operation == 'read' else {'saved': True, 'versions': [], 'count': 0}
+            return getattr(self.versions, operation)(identity, *args)
+
+    def load(self, window_id, open_ids=None, *, open_tabs_only=False):
         with self.lock:
             if not self.opened:
                 result = self.store.read()
                 self.state, self.recovered = result['state'], result['recovered']
                 self.opened = True
+                if self.state is not None:
+                    state = copy.deepcopy(self.state)
+                    protected = set(state['settings'].get('openIds', [note['id'] for note in state['notes']])) | set(open_ids or [])
+                    compacted = self.compact_closed(state, protected)
+                    if compacted:
+                        self.store.write(state)
+                        self.state = state
+                        self.delete_closed_history(compacted)
             state = copy.deepcopy(self.state)
             if state is not None:
                 available = {n['id'] for n in state['notes'] if not n.get('removedAt') and not n.get('trashedAt')}
                 ids = open_ids if open_ids is not None else self.tabs.get(window_id, state['settings'].get('openIds', list(available)))
                 ids = list(dict.fromkeys(i for i in ids if i in available))
                 self.tabs[window_id] = ids
+                if any(note.get('fileLink') and note['id'] in ids for note in state['notes']):
+                    for identity in ids:
+                        if any(note['id'] == identity and note.get('fileLink') for note in self.state['notes']):
+                            self.open_file_link(window_id, identity)
+                    state = copy.deepcopy(self.state)
                 state['settings']['openIds'] = ids
                 # Filters belong to a window. A detached file starts visible.
                 tag_filter = {'kind': 'all'} if open_ids is not None else self.tag_filters.get(window_id, state['settings'].get('tagFilter', {'kind': 'all'}))
@@ -198,7 +293,17 @@ class WorkspaceHub:
                     state['activeId'] = ids[-1] if ids else None
             else:
                 self.tabs.setdefault(window_id, [])
-            return {'state': state, 'recovered': self.recovered}
+            result = {'state': state, 'recovered': self.recovered}
+            if state is not None and open_tabs_only:
+                # Keep the complete validated journal in the hub. Only the
+                # initial bridge payload is reduced; omitted files stay intact.
+                opened = set(state['settings']['openIds'])
+                initial = [note for note in state['notes'] if note['id'] in opened or note.get('fileLink')]
+                if len(initial) < len(state['notes']):
+                    result['deferred'] = True
+                    result['availableIds'] = list(available)
+                    state['notes'] = initial
+            return result
 
     def save(self, window_id, incoming):
         with self.lock:
@@ -216,6 +321,9 @@ class WorkspaceHub:
                     notes[note['id']] = note
                     continue
                 merged = copy.deepcopy(note if note['updatedAt'] > old['updatedAt'] else old)
+                if merged.get('fileLink'):
+                    notes[note['id']] = merged
+                    continue
                 metadata = note if note.get('tagsUpdatedAt', 0) > old.get('tagsUpdatedAt', 0) else old
                 merged['tags'] = copy.deepcopy(metadata.get('tags', []))
                 merged['tagsUpdatedAt'] = metadata.get('tagsUpdatedAt', 0)
@@ -230,8 +338,10 @@ class WorkspaceHub:
             tabs = {key: [i for i in ids if i in available] for key, ids in tabs.items()}
             state['settings']['openIds'] = list(dict.fromkeys(i for ids in tabs.values() for i in ids))
             state['updatedAt'] = max(state.get('updatedAt', 0), (self.state or {}).get('updatedAt', 0))
+            compacted = self.compact_closed(state, set(state['settings']['openIds']))
             self.store.write(state)
             self.state, self.tabs = state, tabs
+            self.delete_closed_history(compacted)
             self.tag_filters[window_id] = copy.deepcopy(state['settings'].get('tagFilter', {'kind': 'all'}))
             return copy.deepcopy(state)
 

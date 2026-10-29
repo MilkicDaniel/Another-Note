@@ -4,9 +4,11 @@ A local text and code editor, available as a standalone HTML file and desktop ap
 
 ## Downloads
 
-- **HTML:** open `Another-Note-2026.10.28-r3.html` in your browser.
-- **Windows:** run `Another-Note-Setup-2026.10.28-r3.exe`, or extract `Another-Note-Windows-2026.10.28-r3.zip` and run `Another-Note.exe` inside it.
-- **Fedora:** extract `Another-Note-Fedora-2026.10.28-r3.zip` and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+- **HTML:** open [Another-Note-2026.10.29-r6.html](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-2026.10.29-r6.html) in your browser.
+- **Windows (earlier build):** run [Another-Note-Setup-2026.10.28-r3.exe](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.28-r3/Another-Note-Setup-2026.10.28-r3.exe), or extract [Another-Note-Windows-2026.10.28-r3.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.28-r3/Another-Note-Windows-2026.10.28-r3.zip) and run `Another-Note.exe` inside it. Windows builds are supplied on request.
+- **Fedora:** extract [Another-Note-Fedora-2026.10.29-r6.zip](https://github.com/MilkicDaniel/Another-Note/releases/download/2026.10.29-r6/Another-Note-Fedora-2026.10.29-r6.zip) and run `python3 install.py` inside the extracted folder. Close all Another Note windows before updating.
+
+[Current release, source archive and checksums](https://github.com/MilkicDaniel/Another-Note/releases/tag/2026.10.29-r6).
 
 Every downloadable file includes its build number, including source ZIPs and checksum lists. The application version is stored in `VERSION`. Internal source and installed runtime filenames remain stable.
 
@@ -169,3 +171,65 @@ HTML and Fedora downloads are provided. Checks cover all offline formatters, par
 Rich table pastes at blank lines in text/Markdown notes open the grid for review. Tab-separated rows also do this at blank Markdown lines. **Paste Text Instead** preserves the original clipboard text. Ordinary code pastes, Markdown code fences, pastes inside prose and Ctrl+Shift+V keep normal text behavior. Copy Cells exports TSV. A file change in another window while the dialog is open blocks a stale update and retains the editable grid for copying.
 
 The main editor keeps portable Markdown, HTML, CSV or TSV source; use the table dialog to edit or preview the cell layout. File type, saved bindings and line endings remain unchanged. The grid supports up to 200 rows, 40 columns, 4,000 cells and 2 MiB of cell text. Larger pastes can stay as text. HTML and Fedora downloads are provided; all r5 preferences are included.
+
+## Build 2026.10.28-r7
+
+**Preferences → Editor Appearance & Formatting… → Appearance** has separate **Dark mode theme** and **Light mode theme** choices. **Follow System** switches between those saved choices automatically. Each preset includes editor, syntax, menu, tab and status colors, with a preview before Apply.
+
+Dark presets: Dracula, Eva Dark, Panda Syntax, Nord, One Monokai, Atom One Dark, Field Lights, ReUI, Visual Studio 2017 Dark (C/C++), and GitHub Dark. Light presets: PowerShell ISE, Atom One Light, Bluloco Light, Grey Light+ Pro, GitHub (Thomas Pink), and Quiet Light for VSC. Another Note's original light and dark themes remain available. The presets adapt the linked VS Code palettes to Another Note's syntax categories and interface; extension features and language-specific scope distinctions are not imported.
+
+Choose **Customize / preview** to edit either mode's syntax and interface colors. Enter a name and use **Save as New Theme** to add it to **My themes**. Saved themes can be selected, updated, renamed with **Update saved theme**, or deleted. **Apply** saves both choices and the theme library locally; Cancel discards the preview. **Restore defaults** keeps My themes. Font and formatting preferences remain separate. Existing custom colors are retained when updating the app.
+
+All themes work offline, persist through restart and use the existing preference synchronization between windows. Theme changes retain source and clipboard text, selection direction, folds and undo history. Theme source versions, palette checksums, mapping code and license notices are included; see [theme sources](tooling/theme-vendor/README.md). HTML and Fedora downloads are provided. Windows builds remain on request. Native GTK and Windows visual testing was not performed for this build.
+
+## Build 2026.10.29-r1
+
+Subtle vertical dividers separate neighboring tabs, using the current theme's border color. The first visible tab has no leading divider. Dividers stay with the tab strip during reordering and do not change tab widths or intercept clicks. HTML and Fedora downloads are provided; Windows builds remain on request.
+
+## Build 2026.10.29-r2
+
+Tab dividers use shorter, rounded strokes with soft ends and a gentler tint of the theme's **Borders** color. Dividers fade beside active, hovered and keyboard-focused tabs, giving the selected tab a clean outline. Reduced-motion settings disable the fade. Tab sizes, click areas, dragging and scrolling retain their existing behavior. HTML and Fedora downloads are provided; Windows builds remain on request.
+
+## Build 2026.10.29-r3
+
+The tab strip follows the supplied reference: flat inactive tabs form a continuous row, with taller, solid vertical separators between them. The selected tab has rounded top corners and curved lower corners that join the strip. Separators stay visible on hover and keyboard focus, and stay hidden beside the selected tab. Colors follow the existing theme settings, including **Borders**, **Inactive tabs** and **Active tab**. Tab sizes, click areas, dragging and scrolling retain their existing behavior. HTML and Fedora downloads are provided; Windows builds remain on request.
+
+## Build 2026.10.29-r4
+
+Longer files open with less display work. Syntax highlighting and fold arrows are drawn around the visible lines, with extra lines above and below for scrolling. Multiline syntax, selections and spelling marks retain their context across the displayed area. The native editor still holds the complete file, including folded text; saving, copying, search, undo, selection direction and display-only color spacing retain their behavior. Fold state stays available for the whole file, and a focused fold control stays focused while scrolling.
+
+On this machine, five alternating native GTK/WebKit launches per build with a synthetic session of 105 saved files, eight open tabs and a 105,000-character active HTML file improved median time to the first painted editor from **1.59 s to 1.23 s** (about **23%**). The window presentation request improved from **1.03 s to 0.69 s**. Three empty-session runs per build stayed around **1.01 s**. These measurements use fresh temporary application caches without clearing OS disk caches; actual launch time depends on the restored files, hardware and desktop session.
+
+All JavaScript and Python suites pass, along with Chromium checks for large-file scrolling, wrapping, Unicode, folds, clipboard text, keyboard focus, native edits, undo, tab switching, font changes and themes. Native GTK/WebKit startup and scroll-alignment checks use isolated synthetic notebooks. Windows visual testing was not performed; Windows builds remain on request. HTML and Fedora downloads are provided.
+
+Reproduce the native measurements with the packaged Fedora page built first:
+
+```sh
+python3 checks/benchmark_startup.py --scenario session --runs 5
+python3 checks/benchmark_startup.py --scenario session --runs 1 --verify-scroll
+python3 checks/benchmark_startup.py --compare /path/to/previous-build --scenario session --runs 5
+```
+
+The benchmark uses a separate app identity and temporary data, config and cache directories. It does not open or modify your notebook. `--profile` adds diagnostic JavaScript timings; leave it off when comparing launch times. The large-file Chromium check is `node checks/editor_startup_browser.cjs`, with optional `PLAYWRIGHT_MODULE` and `CHROMIUM_EXECUTABLE` settings.
+
+
+## Build 2026.10.29-r5
+
+Native startup restores the open tabs first and loads closed files, Trash and removed-file records after the editor's first paint. Every restored tab is visible and usable immediately. The native host retains the complete validated notebook throughout; the smaller initial bridge response never replaces the stored notebook. Initial recovery serialization and saving also wait until after the first paint. Whole-workspace actions and closing wait for any remaining files. Background loading retains edits, undo, folds, cursor direction, tab order, recent files and saved-file baselines. If loading fails, partial saves are blocked and a later operation can retry.
+
+On this machine, five alternating GTK/WebKit launches per build with the same synthetic 105-file, eight-tab session used for the previous benchmark improved median time to the first painted editor from **1.238 s to 1.209 s**, about **2%** beyond build r4. Window presentation requests improved from **0.694 s to 0.676 s**. Three empty-session runs per build measured **0.995 s and 1.036 s**; this change targets restored notebooks, and native WebKit initialization still takes most of the launch time. Measurements use fresh temporary application caches without clearing OS disk caches. They are workload and machine dependent.
+
+The hide/expand controls now fade in when the pointer enters their gutter. Hovering a source row, its wrapped continuation or its line number leaves them hidden. Keyboard focus continues to reveal the controls. Native startup uses a black WebView background and a black page before saved appearance settings arrive, including when the system is light but the app is dark. The saved appearance is applied before the window is presented.
+
+All 43 JavaScript suites and 196 Python tests pass. Delayed-load checks cover usable restored tabs, edits during loading, backward selections, folding, undo, complete recovery journals, failed or invalid loads and retries. Chromium checks cover startup colors, gutter hover, large-file scrolling, themes and preferences. Native GTK/WebKit startup and scroll-alignment checks use temporary synthetic notebooks. Run `node checks/editor_lazy_startup_browser.cjs` for the delayed native-bridge browser check, using the optional browser settings described above. Native Windows visual testing was not performed; Windows packages remain on request. Updated HTML and Fedora downloads are included.
+
+
+## Build 2026.10.29-r6
+
+Desktop files that are closed in every window now retain a display name and a reopening link instead of their text, saved-text copy, assigned tags and version history. The link also carries the identity, dates and language needed for safe workspace merging and reopening. Existing clean closed files with readable disk locations are converted when the notebook loads. Closed links remain in Open Saved File and Recently Closed Files; their contents are read from disk only when opened or included in a backup.
+
+Files in open tabs keep their full contents, tags, history, saved-file baselines and recovery behavior. This includes files that are open in another window and tabs retained for restoration when the last window closes. Closing another file preserves the active file's native text, folding, backward selection and undo. A reopened file starts a fresh local history; delayed checkpoints from before its closure cannot restore its previous history.
+
+Untitled drafts, documents without a remembered disk location, closed documents containing unsaved recovery text, unavailable disk files and Trash retain their recovery copies. The original disk files are not changed by compaction. Portable backups read linked contents without opening tabs; an incomplete backup containing only file links is rejected before import. The standalone HTML edition keeps its existing browser storage behavior.
+
+All 43 JavaScript suites and 206 Python tests pass. The browser regression `node checks/editor_closed_files_browser.cjs` verifies link-only records, preserving open-tab text/tags/history/undo/folds/selection, reopening current disk text, fresh tags and portable backups. Native GTK/WebKit verification with 105 temporary disk files retained the eight open files and compacted 97 closed files, completed a recovery save and checked scroll alignment. Reproduce it with `python3 checks/benchmark_startup.py --scenario linked-session --runs 1 --verify-scroll`; the linked-session probe includes a recovery flush and is intended for correctness verification. Windows host protocol tests pass; native Windows visual testing was not performed and Windows packages remain on request. Fedora and HTML downloads are updated.

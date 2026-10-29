@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+.idea/
 artifacts/
 dist/
 fedora/Another-Note.html

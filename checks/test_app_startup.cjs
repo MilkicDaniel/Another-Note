@@ -32,21 +32,31 @@ function browserDatabase(workspace,failHandles=false){
     setImmediate(()=>tx.oncomplete?.());return tx;
   }};
 }
-async function launch({native=false,failHandles=false,fallback=false,theme='light',systemDark=false,transfer=null,nativeWindows=1,freshWindow=false}={}){
+async function launch({native=false,failHandles=false,fallback=false,theme='light',systemDark=false,transfer=null,nativeWindows=1,freshWindow=false,duringDeferred=null}={}){
   const resolved=theme==='system'?(systemDark?'dark':'light'):theme;
   const workspace={format:'vista-notes',version:1,updatedAt:100,activeId:'existing',settings:{theme,openIds:['existing']},
     notes:[{id:'existing',title:'keep.json',content:'{"keep":true}',mode:'json',createdAt:1,updatedAt:100,trashedAt:0,removedAt:0,fileKey:'remembered-key',diskPath:'/files/keep.json'}]};
+  if(duringDeferred){
+    workspace.notes.push({...workspace.notes[0],id:'other',title:'other.json',content:'{"other":true}'});
+    workspace.notes.push({...workspace.notes[0],id:'closed',title:'closed.json',content:'{"closed":"\u2603"}',tags:['Kept'],savedState:{title:'closed.json',content:'{"closed":"\u2603"}',mode:'json'}});
+    Object.assign(workspace.settings,{openIds:['existing','other'],closedIds:['closed'],recentFiles:[{id:'closed',closedAt:50}]});
+  }
   const elements=new Map([...ids].map(id=>[id,element(id)]));elements.get('searchWorkerSource').textContent=worker;
   for(const id of ['findBar','findAllPanel','errorBanner'])elements.get(id).hidden=true;
   const document={body:element(),documentElement:element(),activeElement:null,visibilityState:'visible',
     getElementById(id){assert.ok(elements.has(id),`Referenced element exists: ${id}`);return elements.get(id);},
     createElement:()=>element(),querySelectorAll:()=>[],querySelector:selector=>selector==='meta[name="another-note-build"]'?{content:build}:element(),addEventListener(){}};
-  const messages=[],saved=[],local=new Map();let serial=0,context;
+  const messages=[],saved=[],remaining=[],local=new Map();let serial=0,context;
+  function releaseRemaining(error=null,invalid=false){
+    assert.equal(remaining.length,1,'Concurrent callers share one deferred load');
+    const data=remaining.shift();window.vistaNotesNativeResult(data.id,{state:invalid?{...workspace,notes:[{}]}:plain(workspace),openIds:workspace.settings.openIds},error);
+  }
   const windowListeners=new Map(),window={addEventListener(type,callback){if(!windowListeners.has(type))windowListeners.set(type,[]);windowListeners.get(type).push(callback);},emit(type,event={}){for(const callback of windowListeners.get(type)||[])callback(event);}};
   const db=browserDatabase(workspace,failHandles);
   const indexedDB={open(){const op={};queueMicrotask(()=>{op.result=db;op.onsuccess();});return op;}};
-  if(native)window.webkit={messageHandlers:{vistaNotes:{postMessage(raw){const data=JSON.parse(raw);messages.push(data);queueMicrotask(()=>{
+  if(native)window.webkit={messageHandlers:{vistaNotes:{postMessage(raw){const data=JSON.parse(raw);messages.push(data);if(data.command==='load_remaining'){remaining.push(data);return;}queueMicrotask(()=>{
     let result={};if(data.command==='load'){result={state:plain(workspace),transfer,windowId:freshWindow?'window-relaunch':'main',nativeDrag:'gesture'};if(freshWindow){result.state.settings.openIds=[];result.state.activeId=null;}}
+    if(data.command==='load'&&duringDeferred){assert.equal(data.deferClosed,true);result.deferred=true;result.availableIds=workspace.notes.map(file=>file.id);result.state.notes=result.state.notes.filter(file=>result.state.settings.openIds.includes(file.id));}
     else if(data.command==='save'){saved.push(data.state);result={saved:true};}
     else if(data.command==='versions_load')result={versions:[]};
     else if(data.command==='versions_store')result={saved:true};
@@ -64,7 +74,9 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
   });
   const instrumented=app.replace('  initialize().catch(error=>{',
     '  globalThis.appTest={getState:()=>state,getHistory:id=>histories.get(id),actions,flush,isFileModified,renderTabs,fileLabel,exportName,validateWorkspace,setFileTag,setTabTagFilter,peers:windowPeers,shouldConfirmWindowClose};globalThis.startup=initialize().catch(error=>{');
-  vm.runInContext(instrumented,context);await context.startup;await context.appTest.flush();
+  vm.runInContext(instrumented,context);await context.startup;
+  if(duringDeferred){await duringDeferred({context,elements,messages,saved,releaseRemaining});return;}
+  await context.appTest.flush();
   assert.equal(elements.get('saveState').hidden,true,'Successful recovery stays quiet in the footer');assert.equal(elements.get('saveLabel').textContent,'');
   assert.equal(elements.get('errorBanner').hidden,true,elements.get('errorBanner').textContent);
   if(freshWindow){
@@ -93,6 +105,34 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
   return {context,elements,messages,window,saved};
 }
 (async()=>{
+  await launch({native:true,duringDeferred:async({context,elements,messages,saved,releaseRemaining})=>{
+    const api=context.appTest,editor=elements.get('editor');
+    assert.ok(messages.some(message=>message.command==='ready'&&!message.failed));
+    assert.equal(messages.some(message=>message.command==='load_remaining'),false,'The editor is ready before loading closed-file bodies');
+    assert.match(elements.get('fileTabs').innerHTML,/keep.json/);assert.match(elements.get('fileTabs').innerHTML,/other.json/);
+    assert.deepEqual(plain(api.getState().settings.closedIds),['closed'],'Recent identities survive a partial workspace');
+    api.actions.next();assert.equal(editor.value,'{"other":true}','Restored inactive tabs work before closed files load');api.actions.previous();
+    context.document.activeElement=editor;editor.emit('beforeinput',{inputType:'insertText'});editor.value='{"edited":"before loading"}';editor.emit('input');
+    editor.setSelectionRange(2,9,'backward');editor.scrollTop=18;
+    const history=api.getHistory('existing'),browse=api.actions.files(),flushing=api.flush();
+    assert.equal(saved.length,0,'No partial recovery journal is sent');assert.equal(elements.get('filesDialog').open,false,'Whole-workspace views wait for all files');
+    releaseRemaining();await flushing;await browse;
+    assert.equal(editor.value,'{"edited":"before loading"}');assert.equal(editor.selectionStart,2);assert.equal(editor.selectionEnd,9);assert.equal(editor.selectionDirection,'backward');assert.equal(editor.scrollTop,18);
+    assert.equal(api.getHistory('existing'),history,'Hydration preserves the active undo history');
+    assert.equal(elements.get('filesDialog').open,true);assert.equal(api.getState().notes.length,3);
+    assert.equal(api.getState().notes.find(file=>file.id==='closed').content,'{"closed":"\u2603"}');
+    assert.deepEqual(plain(api.getState().settings.openIds),['existing','other']);assert.ok(saved.length);
+    for(const snapshot of saved){assert.equal(snapshot.notes.length,3);assert.equal(snapshot.notes.find(file=>file.id==='closed').savedState.content,'{"closed":"\u2603"}');}
+  }});
+  await launch({native:true,duringDeferred:async({context,elements,saved,releaseRemaining})=>{
+    const api=context.appTest;
+    let pending=api.flush(),rejected=assert.rejects(pending,/remaining files/);releaseRemaining('Disk temporarily unavailable');await rejected;
+    assert.equal(saved.length,0,'A failed hydration cannot overwrite closed files');assert.equal(elements.get('errorBanner').hidden,false);
+    pending=api.flush();rejected=assert.rejects(pending,/invalid file/);releaseRemaining(null,true);await rejected;
+    assert.equal(saved.length,0,'An invalid deferred journal also blocks partial saves');
+    pending=api.flush();releaseRemaining();await pending;
+    assert.equal(saved.at(-1).notes.length,3,'Retry restores all files before saving');assert.equal(elements.get('errorBanner').hidden,true);
+  }});
   await launch({native:true,freshWindow:true});
   {
     const {context,elements}=await launch(),api=context.appTest,editor=elements.get('editor');
@@ -162,10 +202,10 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
     api.actions.showAllTabs();assert.equal(elements.get('tagEmptyState').hidden,true);assert.equal(elements.get('notePane').hidden,false);assert.match(elements.get('fileTabs').innerHTML,/data-tab-id="existing"/);
   }
   const boot=scripts.find(script=>script[1].includes('startupTheme'))[2];
-  for(const [saved,systemDark,native,expected] of [[null,true,false,'dark'],[null,false,false,'light'],['{"settings":{"theme":"dark"}}',false,false,'dark'],['{"settings":{"theme":"light"}}',true,false,'light'],['broken',true,false,'dark'],['{"settings":{"theme":"light"}}',true,true,'dark']]){
+  for(const [saved,systemDark,native,expected] of [[null,true,false,'dark'],[null,false,false,'light'],['{"settings":{"theme":"dark"}}',false,false,'dark'],['{"settings":{"theme":"light"}}',true,false,'light'],['broken',true,false,'dark'],['{"settings":{"theme":"light"}}',false,true,'dark'],['{"settings":{"theme":"dark"}}',false,true,'dark']]){
     const root={dataset:{},style:{}};
     vm.runInNewContext(boot,{document:{documentElement:root},window:native?{webkit:{messageHandlers:{vistaNotes:{}}}}:{},localStorage:{getItem:()=>saved},matchMedia:()=>({matches:systemDark})});
-    assert.equal(root.dataset.theme,expected);assert.equal(root.style.backgroundColor,expected==='dark'?'#191e23':'#fcfcfc');
+    assert.equal(root.dataset.theme,expected);assert.equal(root.style.backgroundColor,expected==='dark'?'#000000':'#fcfcfc');assert.equal(root.dataset.starting,native?'dark':undefined);
   }
   await launch({native:true});await launch();await launch({failHandles:true});await launch({fallback:true});
   await launch({native:true,transfer:{fileId:'existing',cursor:{start:2,end:6,top:18,left:3},history:{undo:[{content:'previous',start:0,end:0}],redo:[],last:0}}});
@@ -237,5 +277,5 @@ async function launch({native=false,failHandles=false,fallback=false,theme='ligh
     dialog.returnValue='discard';dialog.close();for(let i=0;i<30&&!dialog.open;i++)await new Promise(resolve=>setImmediate(resolve));assert.equal(api.getState().activeId,id);
     dialog.returnValue='cancel';dialog.close();assert.equal(await closing,false);assert.equal(closed,false);assert.deepEqual(plain(api.getState().settings.openIds),[id]);
   }
-  console.log('Passed: built app recovery, sequential visible close prompts and Cancel, quiet final-window draft retention, browser recovery protection, Save and element/action/theme wiring.');
+  console.log('Passed: deferred startup, usable tabs and edits during loading, failure/invalid-load retry without partial saves, built app recovery, sequential visible close prompts and Cancel, quiet final-window draft retention, browser recovery protection, Save and element/action/theme wiring.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

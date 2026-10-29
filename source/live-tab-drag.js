@@ -155,7 +155,7 @@
     drag.lastPoint={screenX:event.screenX,screenY:event.screenY};
     if(drag.browserTabCursor)return;
     const meta=liveDragMetadata(drag),width=Math.min(128,Math.max(105,Math.round(drag.width||190))),height=36;
-    const light=document.body.dataset.theme==='light',background=light?'#fcfcfc':'#343d46',foreground=light?'#101820':'#e1e8ef';
+    const light=document.body.dataset.theme==='light',style=typeof getComputedStyle==='function'?getComputedStyle(document.body):null,background=style?.getPropertyValue('--active-tab').trim()||(light?'#fcfcfc':'#343d46'),foreground=style?.getPropertyValue('--text').trim()||(light?'#101820':'#e1e8ef');
     const label=escape(meta.title.slice(0,250)),labelEnd=width-(meta.modified?42:29);
     const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><defs><clipPath id="label"><rect x="13" y="0" width="${labelEnd-13}" height="36"/></clipPath></defs><rect width="${width}" height="36" rx="5" fill="${background}"/><text x="13" y="23" font-family="Arial,sans-serif" font-size="12" fill="${foreground}" clip-path="url(#label)">${label}</text>${meta.modified?`<circle cx="${width-35}" cy="18" r="2.5" fill="#e5b178"/>`:''}<text x="${width-17}" y="24" text-anchor="middle" font-family="Arial,sans-serif" font-size="19" fill="${foreground}">×</text></svg>`;
     const x=Math.max(0,Math.min(width-1,Math.round((drag.grabOffset||0)*width/(drag.width||190)))),y=Math.max(0,Math.min(height-1,Math.round(drag.grabOffsetY||0)));

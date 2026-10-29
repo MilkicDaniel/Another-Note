@@ -84,10 +84,10 @@ class StartupWindowTests(unittest.TestCase):
         return app.primary, events, Gtk, GLib
 
     def test_window_waits_for_resolved_editor_theme_before_first_presentation(self):
-        for theme, color in [('dark', '#191e23'), ('light', '#fcfcfc')]:
+        for theme, color in [('dark', '#000000'), ('light', '#fcfcfc')]:
             with self.subTest(theme=theme):
                 app, events, Gtk, GLib = self.app()
-                self.assertEqual(events, [('background', '#191e23'), ('load',)])
+                self.assertEqual(events, [('background', '#000000'), ('load',)])
                 message = types.SimpleNamespace(to_string=lambda: json.dumps({'id': 'ready-1', 'command': 'ready', 'theme': theme}))
                 app.on_message(None, message)
                 self.assertEqual(events[-2:], [('background', color), ('present',)])
@@ -97,7 +97,7 @@ class StartupWindowTests(unittest.TestCase):
                 self.assertEqual(events[-1], ('present',))
                 other = 'light' if theme == 'dark' else 'dark'
                 app.on_message(None, types.SimpleNamespace(to_string=lambda: json.dumps({'id': 'theme-2', 'command': 'appearance', 'theme': other})))
-                self.assertEqual(events[-1], ('background', '#fcfcfc' if other == 'light' else '#191e23'))
+                self.assertEqual(events[-1], ('background', '#fcfcfc' if other == 'light' else '#000000'))
 
     def test_startup_timeout_or_load_error_remains_visible_and_closable(self):
         for failure in ('timeout', 'load'):

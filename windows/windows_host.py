@@ -107,8 +107,12 @@ class Editor:
     def dispatch(self,data):
         command=data.get('command');app=self.app
         if command=='load':
-            result=app.hub.load(self.identity,self.initial_ids);self.initial_ids=None
+            result=app.hub.load(self.identity,self.initial_ids,open_tabs_only=data.get('deferClosed') is True and not self.transfer);self.initial_ids=None
             result.update(windowId=self.identity,nativeDrag=False,liveDrag=True,historyAppend=True,editorBuild=app.build,transfer=self.transfer,openIds=app.hub.open_file_ids());self.transfer=None;return result
+        if command=='load_remaining':
+            return {**app.hub.load(self.identity), 'openIds':app.hub.open_file_ids()}
+        if command=='open_file_link':return app.hub.open_file_link(self.identity,data.get('fileId'))
+        if command=='read_file_link':return app.hub.open_file_link(self.identity,data.get('fileId'),activate=False)
         if command=='ready':
             if self.startup_timer:self.startup_timer.cancel()
             if data.get('build')!=app.build:
@@ -130,7 +134,7 @@ class Editor:
         if command=='title':self.window.set_title(str(data.get('title') or 'Another Note')[:1000]);return {'updated':True}
         if command=='editor_bundle':return app.bundles.read(data.get('bundle'))
         if command=='save':
-            snapshot=app.hub.save(self.identity,data.get('state'));app.publish(self,snapshot);return {'saved':True,'openIds':snapshot['settings']['openIds']}
+            snapshot=app.hub.save(self.identity,data.get('state'));app.publish(self,snapshot);return {'saved':True,'openIds':snapshot['settings']['openIds'],'fileLinks':[note for note in snapshot['notes'] if note.get('fileLink')]}
         if command=='open_tabs':return {'openIds':app.hub.open_file_ids()}
         if command=='window_list':return {'windows':[{'id':editor.identity} for editor in list(app.editors.values()) if editor is not self and editor.loaded and not editor.closed and not editor.closing]}
         if command=='window_message':
@@ -168,10 +172,10 @@ class Editor:
             chosen=self.window.create_file_dialog(app.webview.FileDialog.SAVE,save_filename=Path(data['name']).name)
             if not chosen:raise ValueError('Cancelled')
             destination=Path(chosen[0] if not isinstance(chosen,str) else chosen);app.store.atomic_write(destination,data['text'].encode('utf-8'));return {'saved':True}
-        if command=='versions_load':return {'versions':app.versions.read(data.get('fileId'))}
-        if command=='versions_store':return app.versions.write(data.get('fileId'),data.get('versions'))
-        if command=='versions_append':return app.versions.append(data.get('fileId'),data.get('version'))
-        if command=='versions_delete':return app.versions.delete(data.get('fileId'))
+        if command=='versions_load':return {'versions':app.hub.version_operation('read',data.get('fileId'),epoch=data.get('historyEpoch',0))}
+        if command=='versions_store':return app.hub.version_operation('write',data.get('fileId'),data.get('versions'),epoch=data.get('historyEpoch',0))
+        if command=='versions_append':return app.hub.version_operation('append',data.get('fileId'),data.get('version'),epoch=data.get('historyEpoch',0))
+        if command=='versions_delete':return app.hub.version_operation('delete',data.get('fileId'))
         if command=='clipboard':
             if not isinstance(data.get('text'),str):raise ValueError('Invalid clipboard text.')
             def copy_text():
@@ -268,7 +272,7 @@ class LiveDrags:
 
 class Application:
     def __init__(self,webview,platform,folder,assets=ROOT):
-        self.webview=webview;self.platform=platform;self.folder=Path(folder);self.assets=Path(assets);release=load_release(self.assets);self.build=release['build'];self.editor_digest=release['sha256'];self.uri=(self.assets/release['editor']).as_uri();self.store=NotebookStore(self.folder/'notebook');self.hub=WorkspaceHub(self.store);self.files=FileStore(self.store.folder);self.versions=VersionStore(self.store.folder);self.bundles=BundleStore(self.assets);self.editors={};self.transfers={};self.receipts={};self.lock=threading.RLock();self.drag=LiveDrags(self);self.window_sequence=0
+        self.webview=webview;self.platform=platform;self.folder=Path(folder);self.assets=Path(assets);release=load_release(self.assets);self.build=release['build'];self.editor_digest=release['sha256'];self.uri=(self.assets/release['editor']).as_uri();self.store=NotebookStore(self.folder/'notebook');self.files=FileStore(self.store.folder);self.versions=VersionStore(self.store.folder);self.hub=WorkspaceHub(self.store,self.files,self.versions);self.bundles=BundleStore(self.assets);self.editors={};self.transfers={};self.receipts={};self.lock=threading.RLock();self.drag=LiveDrags(self);self.window_sequence=0
     def log(self,text):
         try:
             self.folder.mkdir(parents=True,exist_ok=True)
@@ -292,7 +296,7 @@ class Application:
         with self.lock:
             identity='main' if self.window_sequence==0 else 'window-'+uuid.uuid4().hex;self.window_sequence+=1;editor=Editor(self,identity,ids,transfer,anchor,launch_point);self.editors[identity]=editor
         try:
-            editor.window=self.webview.create_window('Another Note',url=self.uri,js_api=Bridge(editor),**bounds,min_size=(min(480,bounds['width']),min(340,bounds['height'])),hidden=True,background_color='#191e23',text_select=True)
+            editor.window=self.webview.create_window('Another Note',url=self.uri,js_api=Bridge(editor),**bounds,min_size=(min(480,bounds['width']),min(340,bounds['height'])),hidden=True,background_color='#000000',text_select=True)
             editor.window.events.closing+=editor.request_close;editor.window.events.closed+=editor.on_closed;editor.window.events.loaded+=editor.on_loaded
             def stalled():
                 if not editor.ready.is_set() and not editor.closed:

@@ -12,6 +12,39 @@ from notebook_store import NotebookStore, WorkspaceHub
 
 
 class WindowJournalTests(unittest.TestCase):
+    def test_bootstrap_loads_open_tabs_and_defers_closed_trash_and_tombstones(self):
+        closed = copy.deepcopy(self.parent['notes'][0])
+        closed.update(id='closed', content='Closed source\n\u2603', tags=['Keep'])
+        trash = {**closed, 'id': 'trash', 'trashedAt': 90}
+        removed = {**closed, 'id': 'removed', 'removedAt': 95}
+        self.parent['notes'].extend([closed, trash, removed])
+        self.parent['settings'].update(closedIds=['closed'], recentFiles=[{'id': 'closed', 'closedAt': 80}])
+        self.hub.save('main', self.parent)
+        initial = self.hub.load('main', open_tabs_only=True)
+        self.assertTrue(initial['deferred'])
+        self.assertEqual([note['id'] for note in initial['state']['notes']], ['a', 'b'])
+        self.assertEqual(set(initial['availableIds']), {'a', 'b', 'closed'})
+        self.assertEqual(initial['state']['settings']['closedIds'], ['closed'])
+        self.assertEqual(len(self.hub.state['notes']), 5)
+        self.assertEqual(len(self.store.read()['state']['notes']), 5)
+        # Even an early partial client journal cannot delete deferred records.
+        initial['state']['notes'][0].update(content='Edited before hydration', updatedAt=200)
+        self.hub.save('main', initial['state'])
+        remaining = self.hub.load('main')['state']
+        self.assertEqual(remaining['notes'][0]['content'], 'Edited before hydration')
+        self.assertEqual(remaining['notes'][2:], [closed, trash, removed])
+        self.assertEqual(remaining['settings']['openIds'], ['a', 'b'])
+
+    def test_bootstrap_empty_tabs_and_fully_open_workspace(self):
+        all_open = self.hub.load('main', open_tabs_only=True)
+        self.assertNotIn('deferred', all_open)
+        fresh = self.hub.load('fresh', [], open_tabs_only=True)
+        self.assertTrue(fresh['deferred'])
+        self.assertEqual(fresh['state']['notes'], [])
+        self.assertEqual(fresh['state']['settings']['openIds'], [])
+        self.assertIsNone(fresh['state']['activeId'])
+        self.assertEqual(len(self.hub.load('fresh')['state']['notes']), 2)
+
     def test_editor_preferences_and_reset_survive_stale_window_saves_and_restart(self):
         child=self.hub.load('child',['b'])['state']
         preferences={'appearance':{'fontFamily':'Consolas','fontStyle':'italic','colors':{'dark':{'keyword':'#c0ffee'}}},'formatting':{'java':{'bracePolicy':'always'}}}

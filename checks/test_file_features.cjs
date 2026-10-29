@@ -44,7 +44,8 @@ function fixture(options={}){
     },
     download:async(...args)=>{f.downloads.push(args);return true;},TextDecoder,Uint8Array,Promise,
   });
-  vm.runInContext(['fileLabel','fileSignature','captureSavedState','normalizeSavedState','isFileModified','modeForFilename','refreshFileSyntax','exportName','mergeRecentSettings','validateWorkspace','importEntries','openImport'].map(extract).join('\n')+fs.readFileSync(path.join(__dirname,'../source/tag-features.js'),'utf8')+features+fs.readFileSync(path.join(__dirname,'../source/file-folders.js'),'utf8')+fs.readFileSync(path.join(__dirname,'../source/file-refresh.js'),'utf8'),context);
+  context.loadDeferredWorkspace=async()=>{};
+  vm.runInContext(['fileLabel','fileSignature','captureSavedState','normalizeSavedState','normalizeFileLink','isFileModified','modeForFilename','refreshFileSyntax','exportName','mergeRecentSettings','validateWorkspace','importEntries','openImport'].map(extract).join('\n')+fs.readFileSync(path.join(__dirname,'../source/tag-features.js'),'utf8')+features+fs.readFileSync(path.join(__dirname,'../source/file-folders.js'),'utf8')+fs.readFileSync(path.join(__dirname,'../source/file-refresh.js'),'utf8'),context);
   state.notes[0].savedSignature=context.fileSignature(state.notes[0]);f.context=context;f.file=state.notes[0];
   f.call=(name,...args)=>context[name](...args);f.dirty=()=>context.isFileModified(f.file);
   f.handle=name=>({name,queryPermission:async()=>f.permission||'granted',requestPermission:async()=>f.permission||'granted',
@@ -56,6 +57,13 @@ function fixture(options={}){
 }
 
 (async()=>{
+  {
+    const f=fixture(),before=plain(f.context.state);
+    const linked={format:'vista-notes',version:1,settings:{openIds:[]},notes:[{id:'link',title:'linked.txt',mode:'text',createdAt:1,updatedAt:2,fileLink:true,fileKey:'key',diskPath:'/files/linked.txt'}]};
+    await f.call('importEntries',[{name:'incomplete-backup.json',text:JSON.stringify(linked)}]);
+    assert.deepEqual(plain(f.context.state),before,'A backup containing only links cannot create incomplete source records');
+    assert.ok(f.messages.some(message=>message.includes('file links without their contents')));
+  }
   // Reopening a changed file asks before replacing either clean text or a draft.
   for(const native of [true,false]){
     const f=fixture({native}),entry={name:'reopen.json',text:'{"old":true}',lineEnding:'lf',bom:false};

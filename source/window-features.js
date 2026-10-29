@@ -36,7 +36,7 @@
     for(const peer of windowPeers.values())ids.push(...peer.openIds);
     snapshot.settings.openIds=[...new Set(ids)].filter(id=>available.has(id));return snapshot;
   }
-  function receiveWorkspaceUpdate(value){
+  function receiveWorkspaceUpdate(value,{strict=false}={}){
     if(!ready||!state||startupBlocked)return;
     try{
       const remote=validateWorkspace(value),active=note(),before=active?JSON.stringify(active):'',preferencesStamp=state.settings.editorPreferencesUpdatedAt||0;
@@ -51,7 +51,7 @@
       }
       if((state.settings.editorPreferencesUpdatedAt||0)!==preferencesStamp&&typeof applySettings==='function')applySettings();
       renderList();refreshSpellcheck();if($('dictionaryDialog').open)renderDictionary();if($('manageTagsDialog').open)renderManageTags();
-    }catch(_){}
+    }catch(error){if(strict)throw error;}
   }
   window.vistaNotesWorkspaceChanged=receiveWorkspaceUpdate;
   function restoreWindowTransfer(transfer){

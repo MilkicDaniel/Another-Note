@@ -183,7 +183,7 @@ class WindowsPlatform:
     def appearance(self,editor,theme):
         def apply():
             from System.Drawing import Color
-            color=Color.FromArgb(*( (25,30,35) if theme=='dark' else (252,252,252) ))
+            color=Color.FromArgb(*( (0,0,0) if theme=='dark' else (252,252,252) ))
             editor.window.native.BackColor=color;editor.window.native.webview.DefaultBackgroundColor=color
             try:
                 dark=C.c_int(theme=='dark');dwm=C.WinDLL('dwmapi');dwm.DwmSetWindowAttribute.argtypes=[C.c_void_p,W.DWORD,C.c_void_p,W.DWORD];dwm.DwmSetWindowAttribute(self.handle(editor),20,C.byref(dark),C.sizeof(dark))

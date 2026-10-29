@@ -46,6 +46,35 @@ class GUI:
 def workspace():
     return {'format':'vista-notes','version':1,'updatedAt':100,'activeId':'a','settings':{'openIds':['a'],'theme':'dark'},'notes':[dict(id=id,title=id+'.txt',content='draft '+id,mode='text',createdAt=1,updatedAt=100,trashedAt=0,removedAt=0) for id in 'ab']}
 class WindowsHostTests(unittest.TestCase):
+    def test_closed_file_link_commands_preserve_live_tabs_and_read_disk_for_reopen_and_backup(self):
+        path=self.folder/'linked.txt';path.write_text('Linked source')
+        disk=self.app.files.open(path)
+        saved=dict(title='linked.txt',content='Linked source',mode='text',lineEnding='lf',bom=False)
+        state=copy.deepcopy(self.state)
+        state['notes'].append(dict(id='linked',**saved,createdAt=1,updatedAt=100,savedState=saved,fileKey=disk['fileKey'],diskPath=disk['diskPath'],tags=['Old tag'],tagsUpdatedAt=50))
+        reply=self.source.dispatch({'command':'save','state':state})
+        self.assertTrue(next(file for file in reply['fileLinks'] if file['id']=='linked')['fileLink'])
+        self.assertEqual(self.app.hub.state['notes'][0]['content'],state['notes'][0]['content'])
+        path.write_text('New disk source')
+        before=self.app.hub.open_file_ids()
+        read=self.source.dispatch({'command':'read_file_link','fileId':'linked'})
+        self.assertEqual(read['file']['content'],'New disk source')
+        self.assertEqual(self.app.hub.open_file_ids(),before)
+        opened=self.source.dispatch({'command':'open_file_link','fileId':'linked'})
+        self.assertEqual(opened['file']['content'],'New disk source')
+        self.assertNotIn('tags',opened['file'])
+        self.assertIn('linked',self.app.hub.open_file_ids())
+
+    def test_lazy_bootstrap_keeps_open_tabs_and_defers_other_file_contents(self):
+        fresh=self.app.new_window(ids=['a'])
+        initial=fresh.dispatch({'command':'load','deferClosed':True})
+        self.assertTrue(initial['deferred'])
+        self.assertEqual([note['id'] for note in initial['state']['notes']],['a'])
+        full=fresh.dispatch({'command':'load_remaining'})
+        self.assertEqual([note['id'] for note in full['state']['notes']],['a','b'])
+        self.assertEqual(full['state']['settings']['openIds'],['a'])
+        self.assertEqual(full['openIds'],self.app.hub.open_file_ids())
+
     def test_window_collection_lists_and_routes_only_live_other_editors(self):
         target=self.target();unready=self.app.new_window(ids=[])
         self.assertEqual(self.source.dispatch({'command':'window_list'}),{'windows':[{'id':target.identity}]})

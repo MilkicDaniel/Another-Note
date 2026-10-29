@@ -1,11 +1,12 @@
   const lineMeasure=document.createElement('div');lineMeasure.className='line-measure';lineMeasure.setAttribute('aria-hidden','true');document.body.append(lineMeasure);
   const editorLayout={text:null,starts:[0],key:null,offsets:[],rows:[],activeRow:null,lineHeight:24};
-  const editorSyntax={text:null,mode:null,html:'',rendered:null};
+  const editorSyntax={text:null,mode:null,html:'',rendered:null,windowIndex:null,windowKey:null,windowMarkup:null};
   function releaseEmptyEditorView(){
     if(typeof clearEmptyCodeView==='function')clearEmptyCodeView();
-    Object.assign(editorSyntax,{text:null,mode:null,html:'',rendered:null});
-    Object.assign(editorLayout,{text:null,key:null,starts:[0],offsets:[],hidden:[],rows:[],activeRow:null,caretRow:null,totalHeight:0,textWidth:0});
+    Object.assign(editorSyntax,{text:null,mode:null,html:'',rendered:null,windowIndex:null,windowKey:null,windowMarkup:null});
+    Object.assign(editorLayout,{text:null,key:null,starts:[0],offsets:[],hidden:[],visibleLines:[],rows:[],activeRow:null,caretRow:null,totalHeight:0,textWidth:0});
     for(const id of ['highlightCode','lineNumbers','foldControls','editorColorSwatches'])$(id).innerHTML='';
+    $('highlightCode').classList.remove('highlight-window');$('highlightCode').style.paddingTop='';$('highlightCode').style.paddingBottom='';
     lineMeasure.innerHTML='';
     if(typeof clearEditorColorState==='function')clearEditorColorState();
   }
@@ -31,7 +32,7 @@
     const key=JSON.stringify([showNumbers,foldKey,state.settings.wrap,state.settings.wrap?width:0,styles.fontFamily,styles.fontWeight,styles.fontStyle,styles.fontSize,styles.lineHeight,styles.tabSize,styles.letterSpacing,styles.wordSpacing]);
     if(editorLayout.key===key)return;
     const hidden=starts.map((_,line)=>typeof codeLineHidden==='function'&&codeLineHidden(line));
-    const offsets=[],heights=[];let offset=0;
+    const offsets=[],heights=[],visibleLines=[];let offset=0,visible=0;
     // An unmapped native view has no usable width. Its first allocation
     // invalidates this key; measuring it as a one-pixel editor is wasted work.
     if(state.settings.wrap&&availableWidth>0){
@@ -56,9 +57,42 @@
       lineMeasure.innerHTML=measured.map(line=>`<div>${escape(line.text)||'\u200b'}</div>`).join('');
       [...lineMeasure.children].forEach((child,index)=>heights[measured[index].index]=Math.max(lineHeight,child.getBoundingClientRect().height));
     }
-    for(let i=0;i<starts.length;i++){offsets.push(offset);offset+=hidden[i]?0:heights[i]||lineHeight;}
+    for(let i=0;i<starts.length;i++){offsets.push(offset);visibleLines.push(visible);if(!hidden[i])visible++;offset+=hidden[i]?0:heights[i]||lineHeight;}
     $('lineNumbers').innerHTML=showNumbers?offsets.map((_,i)=>`<div${hidden[i]?' hidden':''}${state.settings.wrap?` style="height:${hidden[i]?0:heights[i]||lineHeight}px"`:''}>${i+1}</div>`).join(''):'';
-    Object.assign(editorLayout,{key,offsets,hidden,rows:[...$('lineNumbers').children],activeRow:null,lineHeight,totalHeight:offset,textWidth:width,caretRow:null});
+    Object.assign(editorLayout,{key,offsets,hidden,visibleLines,rows:[...$('lineNumbers').children],activeRow:null,lineHeight,totalHeight:offset,textWidth:width,caretRow:null});
+  }
+  function indexHighlightLines(html){
+    // Index generated markup once. Reopening its inline tags keeps clipped
+    // multiline tokens, selections and spelling marks balanced on screen.
+    const lines=[{at:0,open:[]}],open=[];
+    for(const match of html.matchAll(/<[^>]*>|[^<]+/g)){
+      const token=match[0];
+      if(token[0]==='<'){
+        if(/^<\//.test(token))open.pop();
+        else if(!/\/>$/.test(token)){const name=/^<([a-z]+)/i.exec(token)?.[1];if(name&&!['br','hr','img','input'].includes(name))open.push({name,html:token});}
+      }else for(let at=token.indexOf('\n');at!==-1;at=token.indexOf('\n',at+1))lines.push({at:match.index+at+1,open:[...open]});
+    }
+    return lines;
+  }
+  function renderHighlightViewport(){
+    // The textarea retains the complete projected text and native editing.
+    // Only the display layer is windowed; spacers retain its scroll geometry.
+    const html=editorSyntax.rendered;if(html===null)return;
+    const code=$('highlightCode'),offsets=editorLayout.offsets,viewport=editor.clientHeight||600;
+    let markup=html,top=0,bottom=0,windowed=false,key=html;
+    if(editorLayout.starts.length>200&&typeof editor.clientHeight==='number'&&editorLayout.totalHeight>viewport*2){
+      const overscan=editorLayout.lineHeight*6;
+      const atY=y=>{let low=0,high=offsets.length;while(low+1<high){const mid=(low+high)>>1;if(offsets[mid]<=y)low=mid;else high=mid;}return low;};
+      const first=atY(Math.max(0,editor.scrollTop-overscan)),last=atY(editor.scrollTop+viewport+overscan),from=editorLayout.visibleLines[first],to=editorLayout.visibleLines[last]+(editorLayout.hidden[last]?0:1);
+      key=[html,editorLayout.key,first,last];if(editorSyntax.windowKey&&Array.isArray(editorSyntax.windowKey)&&key.every((value,i)=>value===editorSyntax.windowKey[i]))return;
+      const lines=editorSyntax.windowIndex||(editorSyntax.windowIndex=indexHighlightLines(html)),start=lines[from],end=lines[to];
+      if(start){
+        markup=start.open.map(tag=>tag.html).join('')+html.slice(start.at,end?.at??html.length)+(end?[...end.open].reverse().map(tag=>`</${tag.name}>`).join(''):'');
+        top=offsets[first];bottom=Math.max(0,editorLayout.totalHeight-(offsets[last+1]??editorLayout.totalHeight));windowed=true;
+      }
+    }else if(editorSyntax.windowKey===key)return;
+    editorSyntax.windowKey=key;code.classList.toggle('highlight-window',windowed);code.style.paddingTop=windowed?top+'px':'';code.style.paddingBottom=windowed?bottom+'px':'';
+    if(editorSyntax.windowMarkup!==markup){code.innerHTML=markup;editorSyntax.windowMarkup=markup;}
   }
   function paintEditor(){
     const n=note();if(!n)return;
@@ -68,10 +102,11 @@
     const decorated=decorateEditorMatches(decorateSpelling(occurrences));
     const html=(typeof decorateCodeStructure==='function'?decorateCodeStructure(decorated):decorated)+(editor.value.endsWith('\n')?'\n':'');
     // Query changes only alter marks; unchanged syntax and gutter geometry are reused.
-    if(editorSyntax.rendered!==html){$('highlightCode').innerHTML=html;editorSyntax.rendered=html;}
+    if(editorSyntax.rendered!==html){editorSyntax.rendered=html;editorSyntax.windowIndex=null;editorSyntax.windowKey=null;}
     updateLineNumbers();syncScroll();updatePosition();refreshSpellcheck();
   }
   function syncScroll(){
+    renderHighlightViewport();
     $('highlight').scrollTop=editor.scrollTop;$('highlight').scrollLeft=editor.scrollLeft;
     $('lineNumbers').style.transform=`translateY(${-editor.scrollTop}px)`;if(typeof renderFoldControls==='function')renderFoldControls();if(typeof syncEditorScrollbars==='function')syncEditorScrollbars();updateActiveLine();scheduleColorSwatches();if(typeof scheduleMinimap==='function')scheduleMinimap();
   }

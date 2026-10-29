@@ -36,6 +36,7 @@
     });
   }
   function openRecentSubmenu(focus=false){
+    if(typeof deferredWorkspace!=='undefined'&&deferredWorkspace){loadDeferredWorkspace().then(()=>openRecentSubmenu(focus)).catch(error=>toast(error.message));return;}
     refreshRecentOpenTabs();
     if(!ready)return;
     const trigger=$('recentMenuTrigger'),popup=$('recentFilesMenu'),parent=trigger.closest('.menu');

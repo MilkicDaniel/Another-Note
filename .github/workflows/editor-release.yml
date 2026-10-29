@@ -43,11 +43,15 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/another-note-browser-checks" --ignore-scripts --no-audit --no-fund playwright@1.56.1
           node "$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright/cli.js" install --with-deps chromium
-      - name: Check the real preferences and table UI
+      - name: Check preferences, themes, tables and startup in Chromium
         shell: bash
         run: |
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_preferences_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_tables_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_themes_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_startup_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_lazy_startup_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_closed_files_browser.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -91,11 +95,12 @@ jobs:
           cat > "$notes" <<EOF
           HTML, Fedora and source downloads for Another Note $version.
 
-          Tools > Insert/Edit Table opens a cell grid with row/column controls, a header option, alignment, Preview and Source views. Tools > Paste Table accepts web/spreadsheet tables, Markdown, CSV and tab-separated data. Paste a cell rectangle into the grid to fill or expand it.
+          Changes and validation details are recorded in the build sections of the README:
+          https://github.com/${{ github.repository }}/blob/$GITHUB_SHA/README.md
 
-          Tables are saved as Markdown, HTML, CSV or TSV source. Rich table pastes at blank note lines open the grid for review; Paste Text Instead keeps the original clipboard text. Code pastes and Markdown code fences keep their normal behavior. Merged cells expand to a rectangular grid, with their values retained in the upper-left cell. Insert/update is one undoable edit and keeps surrounding text intact.
+          Validation includes Python and JavaScript regression suites and Chromium checks for preferences, themes, tables, large-file editing, delayed loading and closed-file links. Native GTK and Windows visual testing are not performed by this workflow.
 
-          Validation includes regression and real Chromium checks for table creation/editing, clipboard formats, quoted multiline cells, merged cells, source preservation, HTML attributes, inert pasted markup, conflict protection, undo and smaller windows. The r5 syntax/font/formatting editor is included. Native GTK and Windows visual testing was not performed for this build.
+          Close all Another Note windows before updating. Windows downloads are built separately on request.
           EOF
           if gh release view "$version" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-is-draft" 2>/dev/null; then
             test "$(cat "$RUNNER_TEMP/release-is-draft")" = true

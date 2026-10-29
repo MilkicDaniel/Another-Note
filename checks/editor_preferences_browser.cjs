@@ -5,7 +5,7 @@ const root=path.join(__dirname,'..'),version=fs.readFileSync(path.join(root,'VER
 const original='// Original draft\nfunction f(value){if(value) return "hello"; else {return "bye";}}';
 const fixture={format:'vista-notes',version:1,updatedAt:100,activeId:'sample',settings:{theme:'dark',fontSize:15,openIds:['sample']},notes:[{id:'sample',title:'sample.js',content:original,mode:'javascript',createdAt:1,updatedAt:100,removedAt:0,trashedAt:0}]};
 (async()=>{
-  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox']});
   const context=await browser.newContext({viewport:{width:1280,height:900},colorScheme:'dark'}),page=await context.newPage(),errors=[],network=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>{if(/^https?:/.test(route.request().url())){network.push(route.request().url());return route.abort();}return route.continue();});

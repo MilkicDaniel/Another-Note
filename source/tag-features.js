@@ -38,6 +38,7 @@
   function mergeFileTags(a,b){
     if(!a)return b;
     const content=b.updatedAt>a.updatedAt?b:a;
+    if(content.fileLink)return content;
     const metadata=(b.tagsUpdatedAt||0)>(a.tagsUpdatedAt||0)?b:a;
     if(metadata===content||(metadata.tagsUpdatedAt||0)===(content.tagsUpdatedAt||0)&&JSON.stringify(normalizeTags(metadata.tags))===JSON.stringify(normalizeTags(content.tags)))return content;
     return {...content,tags:normalizeTags(metadata.tags),tagsUpdatedAt:metadata.tagsUpdatedAt||0};

@@ -18,7 +18,7 @@ class ReleasePackagingTests(unittest.TestCase):
     def test_source_archive_excludes_releases_git_metadata_and_caches(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
-            names=['VERSION','build.py','source/app.js','windows/launcher.py','dist/large.exe','.git/config','artifacts/runtime/cache.bin','checks/__pycache__/test.pyc','tooling/editor-vendor/node_modules/dependency/index.js','tooling/editor-vendor/generated/java-inline.mjs']
+            names=['VERSION','build.py','source/app.js','windows/launcher.py','dist/large.exe','.git/config','.idea/workspace.xml','.agents/local.json','.codex/config.toml','.aws/credentials','artifacts/runtime/cache.bin','checks/__pycache__/test.pyc','tooling/editor-vendor/node_modules/dependency/index.js','tooling/editor-vendor/generated/java-inline.mjs']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('fixture')
             actual={path.relative_to(root).as_posix() for path in source_paths(root)}

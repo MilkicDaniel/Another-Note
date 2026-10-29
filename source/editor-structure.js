@@ -67,14 +67,7 @@
     if(point&&!gutter.hidden&&!$('notePane').hidden){
       const target=document.elementFromPoint(point.x,point.y),rect=editor.getBoundingClientRect();
       if(target?.closest('#editorArea')&&!target.closest('#editorMinimap,.editor-scrollbar,.editor-scrollbar-corner')&&point.x<rect.right&&point.y>=rect.top&&point.y<rect.top+editor.clientHeight){
-        if(target.closest('#foldGutter'))visible=true;
-        else{
-          const y=point.y-$('foldControls').getBoundingClientRect().top,offsets=editorLayout.offsets;
-          if(y>=0&&offsets.length){
-            let low=0,high=offsets.length;while(low+1<high){const mid=(low+high)>>1;if(offsets[mid]<=y)low=mid;else high=mid;}
-            if(!editorLayout.hidden?.[low])visible=Boolean($('foldControls').querySelector('[data-fold-line="'+low+'"]'));
-          }
-        }
+        visible=Boolean(target.closest('#foldGutter'));
       }
     }
     // Fade the persistent bar, so moving between controls or rebuilding its
@@ -88,11 +81,13 @@
     const record=codeRecord(),gutter=$('foldGutter');if(!gutter)return;
     gutter.hidden=!record||record.mode==='text';scheduleFoldHover();const controls=$('foldControls');if(!record||gutter.hidden)return;
     controls.style.transform=`translateY(${-editor.scrollTop}px)`;
-    const key=`${record.id}:${record.revision}:${editorLayout.key}`;if(controls.foldKey===key)return;controls.foldKey=key;
+    const height=editorLayout.lineHeight,overscan=height*3,top=Math.max(0,Math.floor(editor.scrollTop/height)*height-overscan),bottom=Math.ceil((editor.scrollTop+Math.max(editor.clientHeight||0,height))/height)*height+overscan;
+    const focused=document.activeElement?.closest?.('[data-fold-key]')?.dataset.foldKey;
+    const key=`${record.id}:${record.revision}:${editorLayout.key}:${top}:${bottom}:${focused||''}`;if(controls.foldKey===key)return;controls.foldKey=key;
     for(const id of codeRecords.keys())if(id!==record.id&&!state.settings.openIds?.includes(id))codeRecords.delete(id);
-    const byLine=new Map();for(const region of record.structure.regions)if(!codeLineHidden(region.first)&&(!byLine.has(region.first)||record.collapsed.has(region.key)&&!record.collapsed.has(byLine.get(region.first).key)))byLine.set(region.first,region);
+    const byLine=new Map();for(const region of record.structure.regions){const offset=editorLayout.offsets[region.first]||0;if((offset>=top&&offset<=bottom||region.key===focused)&&!codeLineHidden(region.first)&&(!byLine.has(region.first)||record.collapsed.has(region.key)&&!record.collapsed.has(byLine.get(region.first).key)))byLine.set(region.first,region);}
     const markup=[...byLine.values()].map(region=>{const folded=record.collapsed.has(region.key);return `<button type="button" class="fold-toggle${folded?' folded':''}" data-fold-key="${region.key}" data-fold-line="${region.first}" style="top:${editorLayout.offsets[region.first]||0}px;height:${editorLayout.lineHeight}px" aria-expanded="${!folded}" aria-label="${folded?'Expand':'Collapse'} ${escape(region.label)}, lines ${region.first+1} to ${region.last+1}"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="${folded?'M4 2 13 8 4 14Z':'M2 4 14 4 8 13Z'}"/></svg></button>`;}).join('');
-    if(controls.foldMarkup!==markup){controls.innerHTML=markup;controls.foldMarkup=markup;}
+    if(controls.foldMarkup!==markup){controls.innerHTML=markup;controls.foldMarkup=markup;if(focused)[...controls.querySelectorAll('[data-fold-key]')].find(button=>button.dataset.foldKey===focused)?.focus({preventScroll:true});}
   }
   function toggleCodeFold(key,expand=null){
     const record=codeRecord(),region=record?.structure.regions.find(region=>region.key===key);if(!region)return;

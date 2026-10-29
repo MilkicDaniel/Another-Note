@@ -5,7 +5,7 @@ function extract(source,name){const start=source.search(new RegExp(`^  (?:async 
 const counters={measurements:0,gutters:0,highlights:0,syntax:0};
 let fastMeasure=false,proportional=false,cellMeasures=0,activeCaretTop=null,activeCaretReads=0;
 const styles={lineHeight:'24px',fontSize:'15px',fontFamily:'monospace',tabSize:'2',letterSpacing:'0px',wordSpacing:'0px',paddingLeft:'4px',paddingRight:'23px'};
-const classes=()=>{const set=new Set();return {add:name=>set.add(name),remove:name=>set.delete(name),contains:name=>set.has(name)};};
+const classes=()=>{const set=new Set();return {add:name=>set.add(name),remove:name=>set.delete(name),contains:name=>set.has(name),toggle:(name,on)=>on?set.add(name):set.delete(name)};};
 const decode=text=>text.replace(/&(amp|lt|gt|quot|#39);/g,(_,name)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"})[name]);
 function node(id=''){
   let html='';return {id,hidden:false,style:{},children:[],classList:classes(),setAttribute(){},
@@ -77,4 +77,14 @@ context.fileSignature=signature;
 const h={undo:Array.from({length:80},(_,i)=>({content:'x'.repeat(512*1024)+i})),redo:[]};context.trimUndoHistory(h);
 assert.ok(h.undo.length<33);assert.ok(h.undo.at(-1).content.endsWith('79'));assert.ok(h.undo.reduce((sum,item)=>sum+item.content.length*2,0)<=32*1024*1024);
 const huge={undo:[{content:'a'.repeat(20*1024*1024)}],redo:[{content:'b'.repeat(20*1024*1024)}]};context.trimUndoHistory(huge);assert.equal(huge.undo.length,1);assert.equal(huge.redo.length,1,'One step per direction survives the soft byte limit');
+// Large documents keep their complete native text while only the visible
+// highlighting is inserted into the DOM. Scrolling does not retokenize it.
+proportional=false;styles.fontFamily='monospace';styles.fontStyle='normal';styles.lineHeight='24px';editor.clientHeight=240;editor.clientWidth=900;state.settings.wrap=false;
+editor.value=Array.from({length:3000},(_,i)=>'line '+i+' <&> 日本語').join('\n');file.content=editor.value;editor.scrollTop=0;editor.selectionStart=3;editor.rangeEnd=12;editor.selectionDirection='backward';
+context.paintEditor();const source=editor.value,syntaxBefore=counters.syntax;assert.ok($('highlightCode').classList.contains('highlight-window'));assert.match($('highlightCode').innerHTML,/line 0 /);assert.doesNotMatch($('highlightCode').innerHTML,/line 1000 /);assert.ok($('highlightCode').innerHTML.length<3000);
+editor.scrollTop=1000*24;context.syncScroll();assert.match($('highlightCode').innerHTML,/line 1000 /);assert.doesNotMatch($('highlightCode').innerHTML,/line 0 /);assert.equal(counters.syntax,syntaxBefore,'Scrolling uses the existing syntax snapshot');assert.equal(editor.value,source);assert.deepEqual([editor.selectionStart,editor.selectionEnd,editor.selectionDirection],[3,12,'backward']);
+assert.ok(parseFloat($('highlightCode').style.paddingTop)>0);assert.ok(parseFloat($('highlightCode').style.paddingBottom)>0);
+const indexed=context.indexHighlightLines('<span class="tok-string">first &amp;\n<mark class="editor-selection">second\nthird</mark></span>');
+assert.equal(indexed.length,3);assert.deepEqual(JSON.parse(JSON.stringify(indexed[2].open.map(tag=>tag.name))),['span','mark'],'Clipped lines retain nested token and selection context');
+editor.value='small again';file.content=editor.value;editor.scrollTop=0;context.paintEditor();assert.equal($('highlightCode').classList.contains('highlight-window'),false);assert.equal($('highlightCode').style.paddingTop,'');assert.equal($('highlightCode').style.paddingBottom,'');assert.equal($('highlightCode').innerHTML,'small again');
 console.log('Passed: cached syntax/signatures and line geometry, constant-work cursor/scroll updates, wrap/resize/zoom/type invalidation, visible wrapped search targets and bounded large-file undo.');
