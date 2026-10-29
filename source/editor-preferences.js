@@ -34,7 +34,7 @@
     ['Syntax','syntax',['text','keyword','string','number','comment','variable','command','property','operator']],
     ['Markdown','syntax',['heading','emphasis','code','fence'],'Markdown files'],
     ['Editor','surface',['paper','active-line','selection','caret','find-match','gutter','code']],
-    ['Tabs','surface',['tabs','active-tab','inactive-tab','tab-text']],
+    ['Tabs','surface',['tabs','active-tab','inactive-tab','tab-text','tab-divider']],
     ['Menu & status bars','surface',['chrome','chrome-text','status','status-text']],
     ['Panels & controls','surface',['panel','raised','hover','selected','line','line-soft']],
     ['Text & accents','surface',['text','muted','accent','good','danger']]

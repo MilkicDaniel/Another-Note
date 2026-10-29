@@ -94,7 +94,7 @@ button{border-radius:6px}.menu-trigger{border-radius:4px}.menu-popover button{bo
 .file-tabs{background:var(--inactive-tab)}
 .file-tabs>.file-tab{border-radius:0}
 .file-tabs>.file-tab.active{border-radius:6px 6px 0 0;z-index:1}
-.file-tabs>:where(.file-tab:not(.live-tab-drag-source))~.file-tab::before{content:'';position:absolute;left:0;top:50%;width:1px;height:20px;background:var(--line);opacity:.85;transform:translateY(-50%);pointer-events:none}
+.file-tabs>:where(.file-tab:not(.live-tab-drag-source))~.file-tab::before{content:'';position:absolute;left:0;top:50%;width:1px;height:20px;background:var(--tab-divider,var(--line));transform:translateY(-50%);pointer-events:none}
 .file-tabs>.file-tab.active::before,.file-tabs>.file-tab.active:not(.live-tab-drag-source)+.file-tab::before{opacity:0}
 .file-tabs>.file-tab.active::after{content:'';position:absolute;bottom:0;left:-6px;right:-6px;height:6px;background:radial-gradient(circle at 0 0,transparent 5.5px,var(--active-tab) 6px) left bottom/6px 6px no-repeat,radial-gradient(circle at 100% 0,transparent 5.5px,var(--active-tab) 6px) right bottom/6px 6px no-repeat;pointer-events:none}
 .tabbar.tab-drop-preview .file-tabs>.file-tab.active:not(.incoming-tab-preview){border-radius:0;z-index:auto}

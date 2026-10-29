@@ -325,3 +325,9 @@ Tables inserted or updated with the dialog now always show as a grid, even if th
 Editing a cell or changing rows and columns rewrites that table in the dialog's aligned layout. The rest of the file is unchanged.
 
 All 43 JavaScript suites and 218 Python tests pass, with and without PyGObject, along with the Chromium browser checks. The new `node checks/editor_note_table_inline_browser.cjs` covers in-place editing, undo, Escape, new rows, surrounding text, right-click row and column commands, and the dialog notes; it also runs in the release workflow. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real clicks and typing in a table cell and below the table. Windows visual testing was not performed.
+
+## Build 2026.10.29-r16
+
+Tab dividers have their own color, **Tab dividers**, under **Colors → Tabs**. It used to be the general **Borders** color, so a theme whose Borders matched the tab background hid the dividers. This happened in Eva Dark and in custom themes with dark borders. By default the new color blends the inactive tab text into the tab background, so dividers are visible in every theme. Changing Borders no longer affects them. The theme preview shows a divider between the inactive tabs; click it to edit its color. Saved and imported themes get the blended color automatically and are not marked as modified.
+
+All 43 JavaScript suites and 218 Python tests pass, along with the Chromium browser checks. The theme test confirms visible dividers in all 16 built-in themes. Fedora GTK and Windows visual testing were not performed for this change.

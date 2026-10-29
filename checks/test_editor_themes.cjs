@@ -3,17 +3,20 @@ const root=path.join(__dirname,'..'),catalog=JSON.parse(fs.readFileSync(path.joi
 const context=vm.createContext({});
 vm.runInContext('const EditorThemePresets='+JSON.stringify(catalog)+';\n'+fs.readFileSync(path.join(root,'source/editor-style-config.js'),'utf8')+'\nglobalThis.style=EditorStyle;',context);
 const style=context.style,plain=value=>JSON.parse(JSON.stringify(value));
+const mix=(a,b,t)=>'#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*t+parseInt(b.slice(i,i+2),16)*(1-t)).toString(16).padStart(2,'0')).join('');
+for(const mode of ['light','dark'])assert.equal(style.normalize().appearance.surfaces[mode]['tab-divider'],mix(style.surfaces[mode]['tab-text'],style.surfaces[mode]['inactive-tab'],.4),'Default tab dividers match their derived color, so default themes are not marked modified');
 assert.equal(catalog.length,16);assert.equal(new Set(catalog.map(t=>t.id)).size,16);
 assert.equal(catalog.filter(t=>t.mode==='dark').length,10);assert.equal(catalog.filter(t=>t.mode==='light').length,6);
 for(const theme of catalog){
   assert.match(theme.sha256,/^[\da-f]{64}$/);assert.ok(theme.packageUrl.includes('/'+theme.version+'/'));
   assert.deepEqual(Object.keys(theme.colors).sort(),plain(style.tokens.map(([key])=>key)).sort());
-  assert.deepEqual(Object.keys(theme.surfaces).sort(),plain(style.surfaceTokens.map(([key])=>key)).filter(key=>!["caret","find-match","tab-text"].includes(key)).sort(),"Imported palettes keep their source surfaces; newer interface colors are derived");
+  assert.deepEqual(Object.keys(theme.surfaces).sort(),plain(style.surfaceTokens.map(([key])=>key)).filter(key=>!["caret","find-match","tab-text","tab-divider"].includes(key)).sort(),"Imported palettes keep their source surfaces; newer interface colors are derived");
   for(const value of [...Object.values(theme.colors),...Object.values(theme.surfaces)])assert.match(value,/^#[\da-f]{6}$/);
   const applied=style.useTheme({},theme.mode,theme.id);
   assert.equal(style.selectedTheme(applied,theme.mode).id,theme.id);
   assert.deepEqual(plain(applied.appearance.colors[theme.mode]),theme.colors);
-  assert.deepEqual(plain(applied.appearance.surfaces[theme.mode]),{...theme.surfaces,caret:theme.colors.text,'find-match':style.surfaces[theme.mode]['find-match'],'tab-text':theme.surfaces.muted});
+  assert.deepEqual(plain(applied.appearance.surfaces[theme.mode]),{...theme.surfaces,caret:theme.colors.text,'find-match':style.surfaces[theme.mode]['find-match'],'tab-text':theme.surfaces.muted,'tab-divider':mix(theme.surfaces.muted,theme.surfaces['inactive-tab'],.4)});
+  assert.notEqual(applied.appearance.surfaces[theme.mode]['tab-divider'],theme.surfaces['inactive-tab'],theme.id+' keeps visible tab dividers even when Borders match the tabs');
 }
 let preferences=style.useTheme({},'dark','dracula');preferences=style.useTheme(preferences,'light','atom-one-light');
 assert.equal(preferences.appearance.surfaces.dark.paper,'#282a36');assert.equal(preferences.appearance.colors.dark.keyword,'#ff79c6');
