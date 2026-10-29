@@ -967,6 +967,15 @@ def run():
                         raise ValueError('Invalid clipboard text.')
                     self.window.get_clipboard().set(content)
                     self.reply(request_id, {'copied': True})
+                elif command == 'read_clipboard':
+                    def clipboard_read(clipboard, result):
+                        if self.closed:
+                            return
+                        try:
+                            self.reply(request_id, {'text': clipboard.read_text_finish(result) or ''})
+                        except Exception as error:
+                            self.reply(request_id, error=str(error))
+                    self.window.get_clipboard().read_text_async(None, clipboard_read)
                 elif command == 'print':
                     operation = WebKit.PrintOperation.new(self.view)
                     operation.run_dialog(self.window)

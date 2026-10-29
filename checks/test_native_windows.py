@@ -21,6 +21,22 @@ class BackendSelectionTests(unittest.TestCase):
 
 
 class NativeWindowTests(unittest.TestCase):
+    def test_context_menu_clipboard_read_is_async_and_reports_failure(self):
+        clipboard=self.parent.window.get_clipboard.return_value
+        clipboard.read_text_finish.return_value='First\nSecond\t😀'
+        self.send(self.parent,'read_clipboard')
+        self.assertEqual(clipboard.read_text_async.call_args.args[0],None)
+        callback=clipboard.read_text_async.call_args.args[1]
+        callback(clipboard,object())
+        self.assertIn('First\\nSecond\\t',self.replies(self.parent)[-1])
+        clipboard.read_text_finish.side_effect=RuntimeError('Clipboard unavailable')
+        callback(clipboard,object())
+        self.assertIn('Clipboard unavailable',self.replies(self.parent)[-1])
+        self.parent.closed=True
+        self.parent.view.evaluate_javascript.reset_mock()
+        callback(clipboard,object())
+        self.parent.view.evaluate_javascript.assert_not_called()
+
     def test_window_collection_lists_live_editors_and_routes_through_the_host(self):
         child=self.detach();self.send(child,'load');self.send(child,'ready',theme='dark')
         self.send(self.parent,'window_list');self.assertIn(child.window_id,self.replies(self.parent)[-1])

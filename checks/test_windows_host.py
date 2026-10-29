@@ -46,6 +46,15 @@ class GUI:
 def workspace():
     return {'format':'vista-notes','version':1,'updatedAt':100,'activeId':'a','settings':{'openIds':['a'],'theme':'dark'},'notes':[dict(id=id,title=id+'.txt',content='draft '+id,mode='text',createdAt=1,updatedAt=100,trashedAt=0,removedAt=0) for id in 'ab']}
 class WindowsHostTests(unittest.TestCase):
+    def test_context_menu_clipboard_reads_on_the_ui_thread_without_writing(self):
+        clipboard=Mock();clipboard.GetText.return_value='First\nSecond\t😀'
+        ui=Mock(side_effect=lambda fn:fn())
+        with patch.dict('sys.modules',{'System.Windows.Forms':types.SimpleNamespace(Clipboard=clipboard)}),patch.object(self.source,'ui',ui):
+            self.assertEqual(self.source.dispatch({'command':'read_clipboard'}),{'text':'First\nSecond\t😀'})
+            clipboard.SetText.assert_not_called();clipboard.Clear.assert_not_called();ui.assert_called_once()
+            clipboard.GetText.side_effect=RuntimeError('Clipboard unavailable')
+            with self.assertRaisesRegex(RuntimeError,'Clipboard unavailable'):self.source.dispatch({'command':'read_clipboard'})
+
     def test_closed_file_link_commands_preserve_live_tabs_and_read_disk_for_reopen_and_backup(self):
         path=self.folder/'linked.txt';path.write_text('Linked source')
         disk=self.app.files.open(path)

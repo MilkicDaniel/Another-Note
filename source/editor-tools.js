@@ -127,7 +127,7 @@
     replaceText(from,to,replacement,map(start),map(end));
   }
   function wireEditorTools(){
-    editor.addEventListener('contextmenu',event=>{const range=spellingAtPoint(event.clientX,event.clientY);if(!range)return;event.preventDefault();openSpellingMenu(range,event.clientX,event.clientY);});
+    editor.addEventListener('contextmenu',event=>{if(event.defaultPrevented)return;const range=spellingAtPoint(event.clientX,event.clientY);if(!range)return;event.preventDefault();openSpellingMenu(range,event.clientX,event.clientY);});
     $('spellingMenu').addEventListener('click',event=>{const context=spellContext;if(event.target.closest('[data-open-dictionary]'))return openDictionary();if(!context||note()?.id!==context.id||editor.value!==context.text)return closeMenus();const replacement=event.target.closest('[data-spelling-replacement]');if(replacement){closeMenus();replaceText(context.start,context.end,replacement.dataset.spellingReplacement);}else if(event.target.closest('[data-add-spelling-word]'))setDictionaryWord(context.word);});
     wirePopupKeys($('spellingMenu'),{focus:()=>editor.focus()});
     $('dictionaryForm').addEventListener('submit',event=>{event.preventDefault();if(setDictionaryWord($('dictionaryWord').value))$('dictionaryWord').value='';else{$('dictionaryWord').setCustomValidity('Enter a word without spaces.');$('dictionaryWord').reportValidity();}});

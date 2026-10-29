@@ -39,6 +39,8 @@
   /* EDITOR_PREFERENCES */
   /* TABLE_DATA */
   /* EDITOR_TABLES */
+  /* NOTE_TABLES */
+  /* EDITOR_CONTEXT_MENU */
   /* CODE_INTELLIGENCE */
   /* EDITOR_COMPLETIONS */
   /* EDITOR_COLORS */
@@ -349,7 +351,7 @@
   }
   function refreshFileSyntax(file){
     if(note()?.id!==file.id)return;
-    $('language').value=file.mode;paintEditor();updateStats();
+    $('language').value=file.mode;paintEditor();updateStats();if(typeof refreshNoteTableView==='function')refreshNoteTableView();
   }
   function colorCode(code,mode){return mode==='bash'?colorBash(code):mode==='json'?colorJSON(code):mode==='markdown'?colorMarkdown(code):mode==='java'||mode==='javascript'?colorCLike(code,mode):mode==='python'?colorPython(code):mode==='css'?colorCSS(code):mode==='html'?colorHTML(code):escape(code);}
 
@@ -379,7 +381,7 @@
   }
   function rememberHistory(n=note(),force=false){if(!n)return;checkpointVersion(n,force?'Before an edit':'Before typing',force);let h=histories.get(n.id);if(!h){h={undo:[],redo:[],last:0};histories.set(n.id,h);}const entry={content:n.content,start:editor.selectionStart,end:editor.selectionEnd,direction:editor.selectionDirection||'none',find:findHistorySnapshot()};if(force||Date.now()-h.last>500||!h.undo.length)h.undo.push(entry);h.last=Date.now();h.redo=[];trimUndoHistory(h);}
   function undo(redo=false){const n=note();if(!n||n.trashedAt||currentView!=='edit')return;const h=histories.get(n.id);if(!h)return;const from=redo?h.redo:h.undo,to=redo?h.undo:h.redo;const entry=from.pop();if(!entry)return;to.push({content:n.content,start:editor.selectionStart,end:editor.selectionEnd,direction:editor.selectionDirection||'none',find:findHistorySnapshot()});trimUndoHistory(h);n.content=entry.content;n.updatedAt=clock();editor.value=entry.content;editor.focus();editor.setSelectionRange(entry.start,entry.end,['forward','backward'].includes(entry.direction)?entry.direction:'none');restoreFindHistory(entry.find);h.last=0;afterEdit();}
-  function afterEdit(){const n=note();if(!n)return;scheduleVersion(n);updateFileIndicators();paintEditor();updateStats();save();if(!$('findBar').hidden)refreshInlineFind();refreshFindAllStatus();clearTimeout(listTimer);listTimer=setTimeout(renderList,350);}
+  function afterEdit(){const n=note();if(!n)return;scheduleVersion(n);updateFileIndicators();paintEditor();updateStats();save();if(!$('findBar').hidden)refreshInlineFind();refreshFindAllStatus();clearTimeout(listTimer);listTimer=setTimeout(renderList,350);if(typeof scheduleNoteTableView==='function')scheduleNoteTableView();}
   function replaceText(start,end,text,selectionStart=start+text.length,selectionEnd=selectionStart){const n=note();if(!n||n.trashedAt)return;rememberHistory(n,true);const before=editor.value;editor.setRangeText(text,start,end,'end');if(findSession?.text===before)trackFindEdit(start,end,editor.value.length-before.length+end-start);editor.setSelectionRange(selectionStart,selectionEnd);n.content=editor.value;n.updatedAt=clock();afterEdit();editor.focus();}
   function storeCursor(){const n=note();if(n)cursors.set(n.id,{start:editor.selectionStart,end:editor.selectionEnd,direction:editor.selectionDirection||'none',top:editor.scrollTop,left:editor.scrollLeft});}
   function selectNote(id,focus=false){
@@ -402,12 +404,14 @@
     syncScroll();if(!$('findBar').hidden&&!n.trashedAt){beginFindSession();refreshInlineFind();}else closeFind(false);
     $('fileTabs').querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest',inline:'nearest'});
     if(focus)editor.focus();
+    if(typeof refreshNoteTableView==='function')refreshNoteTableView({select:true,focus});
   }
   function snippet(content){return content.replace(/^[#>`~*\-\s]+/gm,'').replace(/\n+/g,' ').slice(0,140)||'Empty file';}
   function renderList(){if(!state)return;refreshFindAllStatus();renderTabs();$('noteCount').textContent=liveNotes().length;$('trashCount').textContent=state.notes.filter(n=>n.trashedAt&&!n.removedAt).length;if(!$('filesDialog').open)return;$('trashNav').classList.toggle('active',trashView);$('trashNav').querySelector('span').textContent=trashView?'Back to files':'Trash';$('listLabel').textContent=trashView?'TRASH':'ALL FILES';let notes=state.notes.filter(n=>!n.removedAt&&Boolean(n.trashedAt)===trashView);notes.sort((a,b)=>(Number(b.pinned)-Number(a.pinned))||(state.settings.sort==='title'?fileLabel(a).localeCompare(fileLabel(b)):state.settings.sort==='created'?b.createdAt-a.createdAt:b.updatedAt-a.updatedAt));$('noteList').innerHTML=notes.length?notes.map(n=>`<button type="button" class="note-card ${n.id===state.activeId?'selected':''}" data-note="${escape(n.id)}" role="listitem" aria-current="${n.id===state.activeId?'true':'false'}"><span class="note-card-header">${icon(n.mode!=='text'&&n.mode!=='markdown'?'code':'note')}<span class="note-card-title">${escape(fileLabel(n))}</span>${n.pinned?'<span class="pin-mark">PIN</span>':''}</span><span class="note-card-preview">${escape(n.fileLink?n.diskPath:snippet(n.content))}</span><span class="note-card-meta"><span>${new Date(n.updatedAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span><span class="type-tag ${n.mode}">${escape(MODES[n.mode])}</span></span></button>`).join(''):`<div class="list-empty">${trashView?'Trash is empty.':'No saved files.'}</div>`;}
   function renderAll(){
     renderList();const n=note();if(n){selectNote(n.id);return;}
     if(!state.settings.openIds.length&&typeof releaseEmptyEditorView==='function')releaseEmptyEditorView();
+    if(typeof resetNoteTableView==='function')resetNoteTableView();
     if(syncTagEmptyState())return;
     closeFind(false);syncSpellStatus();syncFileViewControls();
     $('notePane').hidden=true;$('emptyState').hidden=false;$('language').disabled=true;syncSelectControls();
@@ -447,7 +451,7 @@
     original.removedAt=clock();original.updatedAt=original.removedAt;original.content='';original.title='';original.savedState=null;original.savedSignature=fileSignature(original);delete original.fileKey;delete original.diskPath;delete original.versions;histories.delete(id);cursors.delete(id);deleteVersionHistory(id).catch(error=>toast(error.message));
     state.activeId=state.notes.find(x=>x.trashedAt&&!x.removedAt)?.id||null;save();renderAll();toast('File permanently deleted.');
   }
-  function setView(){currentView='edit';if(state)state.settings.view='edit';}
+  function setView(){currentView='edit';if(state)state.settings.view='edit';if(typeof showSourceEditor==='function')showSourceEditor({remember:false,focus:false,repaint:false});}
   function applySettings(){
     const s=state.settings;const resolved=s.theme==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):s.theme;
     document.body.dataset.theme=resolved;document.documentElement.dataset.theme=resolved;document.documentElement.style.colorScheme=resolved;document.documentElement.style.backgroundColor=resolved==='dark'?'#191e23':'#fcfcfc';document.documentElement.style.setProperty('--editor-size',`${s.fontSize}px`);
@@ -954,7 +958,7 @@
     $('noteTitle').addEventListener('input',()=>{const n=note();if(!n||n.trashedAt)return;n.title=$('noteTitle').value;const mode=modeForFilename(n.title,n.mode);if(mode!==n.mode){n.mode=mode;refreshFileSyntax(n);}touchNote();updateStats();renderList();save();});
     $('noteTitle').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('renameDialog').close();editor.focus();}});
     $('historyDialog').addEventListener('close',()=>{historyFileId=null;historySelection=-1;$('historyPreview').innerHTML='';$('historyVersions').innerHTML='';trimVersionMemoryCache();});
-    $('language').addEventListener('change',()=>{const n=note();if(!n)return;n.mode=$('language').value;touchNote();paintEditor();updateStats();renderList();save();});
+    $('language').addEventListener('change',()=>{const n=note();if(!n)return;n.mode=$('language').value;touchNote();paintEditor();updateStats();renderList();save();refreshNoteTableView();});
     $('pinButton').addEventListener('click',()=>{const n=note();if(!n||n.trashedAt)return;n.pinned=!n.pinned;touchNote();$('pinButton').classList.toggle('active',n.pinned);$('pinButton').textContent=n.pinned?'Unpin File':'Pin File';$('pinButton').setAttribute('aria-label',n.pinned?'Unpin file':'Pin file');renderList();save();});
     wireSearchFields();$('findInput').addEventListener('input',refreshInlineFind);
     for(const id of ['findInput','replaceInput'])$(id).addEventListener('focus',()=>{searchHighlightOwner='inline';paintEditor();});
@@ -982,7 +986,7 @@
     window.addEventListener('storage',e=>{if(!native&&e.key===KEY&&e.newValue){try{receiveWorkspaceUpdate(JSON.parse(e.newValue));}catch(_){}}});
   }
 
-  async function initialize(){wireCodeStructure();wireKeyboardShortcuts();wireEvents();wireEditorPreferences();wireEditorTables();wireFileDrops();wireFolderImport();wireTabScrolling();wireEditorTools();wireEditorCompletions();wireEditorColors();wireEditorLinks();wireEditorScrollbars();wireSymbolReferences();wireMinimap();wireOccurrenceHighlights();let found=false,initialTransfer=null;state=emptyWorkspace();const seed=await receiveBrowserWindowSeed();if(native){document.body.classList.add('desktop-app');$('storageCaption').textContent='Files saved to disk';try{const result=await request('load',{deferClosed:true});deferredWorkspace=result.deferred===true;nativeHistoryAppend=result.historyAppend===true;if(result.state){state=validateWorkspace(result.state,result.availableIds||[]);found=true;}updateNativeOpenTabs(result.openIds,false);initialTransfer=result.transfer;nativeLiveDragEnabled=result.liveDrag===true;if(result.recovered)toast('Recovered your files from the previous saved copy.');}catch(error){startupBlocked=true;storageFailure=error.message;showError(`Your saved workspace could not be opened. ${error.message} Existing files have been kept. Close the app and restore a backup; the workspace will not be overwritten.`);savedIndicator('Could not open files','failed');}}
+  async function initialize(){wireCodeStructure();wireKeyboardShortcuts();wireEvents();wireEditorPreferences();wireEditorTables();wireNoteTables();wireEditorContextMenu();wireFileDrops();wireFolderImport();wireTabScrolling();wireEditorTools();wireEditorCompletions();wireEditorColors();wireEditorLinks();wireEditorScrollbars();wireSymbolReferences();wireMinimap();wireOccurrenceHighlights();let found=false,initialTransfer=null;state=emptyWorkspace();const seed=await receiveBrowserWindowSeed();if(native){document.body.classList.add('desktop-app');$('storageCaption').textContent='Files saved to disk';try{const result=await request('load',{deferClosed:true});deferredWorkspace=result.deferred===true;nativeHistoryAppend=result.historyAppend===true;if(result.state){state=validateWorkspace(result.state,result.availableIds||[]);found=true;}updateNativeOpenTabs(result.openIds,false);initialTransfer=result.transfer;nativeLiveDragEnabled=result.liveDrag===true;if(result.recovered)toast('Recovered your files from the previous saved copy.');}catch(error){startupBlocked=true;storageFailure=error.message;showError(`Your saved workspace could not be opened. ${error.message} Existing files have been kept. Close the app and restore a backup; the workspace will not be overwritten.`);savedIndicator('Could not open files','failed');}}
     else{const copies=[];let invalid=false;try{const text=localStorage.getItem(KEY);if(text)copies.push(validateWorkspace(JSON.parse(text)));}catch(_){invalid=true;}try{database=await openDatabase();const [data]=await Promise.all([readDatabase(),loadBrowserFileHandles().catch(()=>{})]);if(data)copies.push(validateWorkspace(data));}catch(_){}if(copies.length){state=copies.reduce((a,b)=>mergeWorkspaces(a,b,false));found=true;}else if(invalid){startupBlocked=true;storageFailure='The saved workspace could not be read.';showError('Your saved workspace could not be read. Its data has been kept. Export a backup before changing browser storage.');}}
     if(seed){state=mergeWorkspaces(validateWorkspace(seed.workspace),state);initialTransfer=seed.transfer;if(seed.handle)await rememberBrowserHandle(seed.transfer.fileId,seed.handle);found=true;startupBlocked=false;storageFailure='';}
     else restoreWindowTabs();

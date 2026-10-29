@@ -182,6 +182,12 @@ class Editor:
                 from System.Windows.Forms import Clipboard
                 Clipboard.SetText(data['text']) if data['text'] else Clipboard.Clear()
             self.ui(copy_text);return {'copied':True}
+        if command=='read_clipboard':
+            values=[]
+            def read_text():
+                from System.Windows.Forms import Clipboard
+                values.append(str(Clipboard.GetText()))
+            self.ui(read_text);return {'text':values[0]}
         if command=='print':self.ui(lambda:self.window.native.webview.CoreWebView2.ShowPrintUI());return {'printed':True}
         if command=='close_prompt':return {'waiting':True,'windowCount':sum(not e.closed for e in app.editors.values())}
         if command=='close_ready':self.can_destroy=True;threading.Timer(.05,self.destroy).start();return {'closed':True}

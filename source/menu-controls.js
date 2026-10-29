@@ -17,6 +17,7 @@
     document.querySelectorAll('[data-submenu]').forEach(trigger=>trigger.setAttribute('aria-expanded','false'));
   }
   function closeMenus(){
+    if(typeof dismissEditorContextMenu==='function')dismissEditorContextMenu();
     document.querySelectorAll('.menu-popover').forEach(popup=>{if(popup.getAttribute('popover')!==null)popup.hidePopover?.();popup.hidden=true;});
     document.querySelectorAll('.menu-trigger,.tab-dropdown,[data-submenu],.select-trigger').forEach(trigger=>trigger.setAttribute('aria-expanded','false'));
   }

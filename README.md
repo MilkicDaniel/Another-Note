@@ -236,3 +236,24 @@ All 43 JavaScript suites and 206 Python tests pass. The browser regression `node
 
 
 The requested Windows installer and portable ZIP for build **2026.10.29-r6** are also supplied. Publication runs the regression suites, verifies the package hashes and embedded installer payload, and checks actual packaged launches, native placement and tab consolidation on a Windows runner. The runner has one display; physical dual-monitor and mixed-DPI hardware testing is not available. Adding Windows downloads preserves the existing published HTML, Fedora and source downloads and extends their checksum list.
+
+
+## Build 2026.10.29-r7
+
+The table editor and Preview use a flat grid with clearer thin borders, more cell spacing and column widths based on their contents. The existing font family, size, weight and style are retained. Safe web/email links in table cells appear as links in Preview; pasted scripts and images are not rendered, and source text is kept intact.
+
+Click a column letter in Edit Cells, a heading in Preview, or **Select Column** to select a whole column. **Ctrl+Space** also selects the focused column. Click a cell and **Shift-click** another row to select a range in that column; the range stays in its starting column even if the final click is in a neighboring column. Shift+Up/Down extends an existing range, and Preview cells also support starting a range with those keys. **Copy Column**, **Copy Selection** or **Ctrl+C** copies only the selected cells as tab-separated values. Normal text selections inside a cell retain native copy behavior. Escape clears a column selection; Escape again closes the dialog. Source view retains normal source selection.
+
+Selection and copying do not modify the note or its saved table source. Apply remains one undoable edit, and Cancel retains the original source and backward caret selection. Single-column CSV/TSV copies preserve empty cells, quoted values, whitespace, embedded line breaks and Unicode. The grid supports wide tables and smaller windows without changing font preferences.
+
+All 43 JavaScript suites and 210 Python tests pass. `node checks/editor_table_columns_browser.cjs` verifies the layout, unchanged regular and custom fonts, column/range copying, keyboard navigation, safe previews, exported alignment, source preservation and narrow layouts with browser and simulated native clipboard bridges. The existing table insertion/paste/undo browser regression also passes. Native GTK/Windows visual testing was not performed for this build. Local HTML and Fedora artifacts are generated with `python3 package_release.py`; published downloads above remain at r6 until this build is published. Windows builds remain on request.
+
+## Build 2026.10.29-r8 (local)
+
+Tables now appear as bordered grids in the main note area, including Markdown tables in plain text notes. Headers are centered, cells have consistent padding, and inline code uses subtle backgrounds. Your editor font, size, weight and style are retained. Notes containing fenced table examples keep those examples as source. Code documents stay in the source editor.
+
+Click a column heading to select that column, or click a cell and Shift-click another row to select a vertical range in the same column. Ctrl+C copies only those cells as spreadsheet-compatible text. Double-click a cell or right-click and choose **Edit Table** to change it. **Edit Source** returns to the original editable Markdown/HTML; **Table View** restores the grid. Source text, selections, folding and undo are preserved.
+
+Right-click inside the note for Undo, Redo, Cut, Copy, Paste, Select All and **Add Table…**. Table cells also offer column selection and column/table copying. Shift+F10 opens the same menu from the keyboard. **Add Table** inserts a new table without replacing the table under the pointer. Clipboard failures and changes made while a paste is pending never discard edits or paste into another tab.
+
+This build is local; the public download links above still point to the published r6 release. Browser checks cover the main table view, source switching, columns, right-click actions, exact saved text, unchanged custom fonts, undo, small windows, clipboard failures and paste races. Desktop bridge checks use isolated browser/mocked host fixtures; these do not constitute native Windows or GTK visual testing.

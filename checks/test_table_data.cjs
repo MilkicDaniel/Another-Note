@@ -20,4 +20,23 @@ const html=tables.serialize(tables.model([['<script>','A & B'],['"quoted"','one\
 for(const text of ['a,b\n"missing', '"quoted"x,b'])assert.throws(()=>tables.delimited(text,','),/quoted/);
 for(const [r,c]of [[0,2],[1,0],[201,1],[1,41],[200,40],[1.5,2]])assert.throws(()=>tables.size(r,c),/rows/);
 assert.throws(()=>tables.delimited('x'.repeat(tables.limits.characters+1)),/too large/);assert.throws(()=>tables.model([['x'.repeat(tables.limits.characters+1)]]),/too large/);
-console.log('Passed: table text parsing, quoted CSV/TSV, ragged/blank cells, multiline and Unicode values, Markdown source preservation, header/alignment, document ranges, escaping and bounded grids.');
+const selectionSource=tables.model([['Name','Value','Other'],['First',' one ','never copy'],['Second','two\nlines','other data'],['Third','"quoted"\t\ud83d\ude00','unused']]);
+const selectionBefore=JSON.stringify(selectionSource),selected=tables.column(selectionSource,1,3,1);
+assert.deepEqual(rows(selected),[[' one '],['two\nlines'],['"quoted"\t\ud83d\ude00']],'A backward range contains only its column, in table order');
+assert.equal(selected.header,false);assert.equal(tables.column(selectionSource,1).header,true);
+const copied=tables.serialize(selected,'tsv');assert.deepEqual(rows(tables.delimited(copied,'\t')),rows(selected),'Selected column values retain whitespace, embedded newlines, tabs, quotes and Unicode');
+assert.doesNotMatch(copied,/never copy|other data|unused/);assert.equal(JSON.stringify(selectionSource),selectionBefore,'Column selection leaves all table values and source metadata unchanged');
+for(const args of [[-1],[3],[1,-1,2],[1,0,4],[1,1.5,2]])assert.throws(()=>tables.column(selectionSource,...args),/one table column/);
+for(const values of [[['']],[['x'],['']],[[''],[''],['']]]){const data=tables.model(values);for(const format of ['csv','tsv'])assert.deepEqual(rows(tables.delimited(tables.serialize(data,format),format==='csv'?',':'\t')),values,'Empty cells in a single copied column must survive round trips');}
+const multi='😀 Before\n\n'+original+'\n\n```markdown\n'+original+'\n```\n\n'+alignedText+'\nAfter';
+const visible=tables.documentTables(multi,'text');
+assert.equal(visible.length,2,'Plain notes render tables while fenced examples remain source');
+assert.equal(multi.slice(visible[0].from,visible[0].to),original,'UTF-16 source offsets include preceding Unicode');
+assert.equal(multi.slice(visible[1].from,visible[1].to),alignedText);
+assert.equal(tables.documentTables(multi,'markdown').length,2);
+for(const mode of ['javascript','json','python','css','html'])assert.deepEqual(plain(tables.documentTables(multi,mode)),[],'Code documents remain native source');
+for(const source of ['Words | words\nMore | prose','| A | B |\n| -- | --- |\n| 1 | 2 |','```\n'+original,'~~~text\n'+original])assert.deepEqual(plain(tables.documentTables(source)),[]);
+assert.deepEqual(plain(tables.documentTables('Prefix\n'+original+'\nEnd').map(block=>block.data.rows)),[rows(tables.markdown(original))],'Rendering does not require blank lines around a table');
+assert.deepEqual(plain(tables.documentTables('x'.repeat(tables.limits.characters)+original)),[],'Large documents stay in the native editor');
+assert.deepEqual(plain(tables.documentTables(original.split('\n').map(line=>'    '+line).join('\n'),'markdown')),[],'Indented source examples remain code');
+console.log('Passed: table text parsing, quoted CSV/TSV, source ranges and preservation, fenced/code exclusions, escaping, bounded grids and column copying.');
