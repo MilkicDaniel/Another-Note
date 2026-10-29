@@ -1,5 +1,10 @@
 .note-tables{flex:1;min-height:0;overflow:auto;padding:18px 22px 36px;background:var(--paper);color:var(--text);font-family:var(--editor-font,monospace);font-size:var(--editor-size,14px);font-weight:var(--editor-font-weight,400);font-style:var(--editor-font-style,normal);line-height:var(--editor-line,24px);--note-table-border:color-mix(in srgb,var(--text) 18%,var(--paper));--note-table-selection:color-mix(in srgb,var(--accent) 20%,var(--paper))}
-.note-text-block{margin:0 0 16px;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;color:inherit}
+.note-text-block{display:block;width:100%;min-height:calc(var(--editor-line,24px) + 4px);margin:0 0 12px;padding:2px 0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;line-height:inherit;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;resize:none;outline:0}
+.note-text-block::placeholder{color:var(--muted);opacity:.45;transition:opacity .12s}.note-text-block:hover::placeholder,.note-text-block:focus::placeholder{opacity:.8}
+.note-text-block:focus{box-shadow:inset 2px 0 var(--accent);padding-left:8px}
+.note-table-grid td{cursor:text}.note-table-grid .note-cell-editing{padding:0;background:color-mix(in srgb,var(--accent) 8%,var(--paper));outline:2px solid var(--accent);outline-offset:-2px}
+.note-cell-input{display:block;width:100%;min-height:44px;margin:0;padding:12px 20px;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;line-height:inherit;text-align:inherit;white-space:pre-wrap;overflow:hidden;resize:none;outline:0}
+@media(max-width:700px){.note-cell-input{padding:10px 12px}}
 .note-table-block{margin:0 0 18px;overflow-x:auto}
 .note-table-grid{border-collapse:collapse;width:100%;background:var(--paper);font:inherit;color:inherit}
 .note-table-grid th,.note-table-grid td{border:1px solid var(--note-table-border);padding:12px 20px;min-width:90px;max-width:640px;vertical-align:middle;white-space:pre-wrap;overflow-wrap:break-word;font:inherit}

@@ -21,7 +21,7 @@ for key in ['DATA', 'CACHE', 'CONFIG']: os.environ['XDG_%s_HOME' % key] = str(d 
 content = 'function greet(name) {\n  if (name) return "Hello";\n  return "Ready";\n}\nconst count = 3;\n'
 fixture = {'format': 'vista-notes', 'version': 1, 'updatedAt': 100, 'activeId': 'a', 'settings': {'theme': 'dark', 'openIds': ['a', 'b']},
            'notes': [{'id': 'a', 'title': 'sample.js', 'content': content, 'mode': 'javascript', 'createdAt': 1, 'updatedAt': 100, 'removedAt': 0, 'trashedAt': 0},
-                     {'id': 'b', 'title': 'other.txt', 'content': 'Other', 'mode': 'text', 'createdAt': 1, 'updatedAt': 90, 'removedAt': 0, 'trashedAt': 0}]}
+                     {'id': 'b', 'title': 'other.txt', 'content': 'Other\n\n| Name | Port |\n| --- | --- |\n| web | 80 |', 'mode': 'text', 'createdAt': 1, 'updatedAt': 90, 'removedAt': 0, 'trashedAt': 0}]}
 folder = d / 'data/vista-notes/notebook'; folder.mkdir(parents=True); (folder / 'notes.json').write_text(json.dumps(fixture))
 sys.path.insert(0, str(ROOT / 'fedora'))
 import launcher
@@ -218,6 +218,15 @@ def load_toolkit():
         ('table', lambda n: js("document.querySelector('[data-action=table]').click();return 1", lambda v: GLib.timeout_add(700, lambda: (n(), False)[1]))),
         ('table-ok', check('table dialog uses themed controls', "const d=document.getElementById('tableDialog'),cb=getComputedStyle(document.getElementById('tableHeader'));return [d.open,d.querySelectorAll('select:not([hidden])').length,cb.appearance,cb.height]", lambda v: v == [True, 0, 'none', '14px'])),
         ('snap-table', lambda n: snapshot('9-table', n)),
+        ('table-close', lambda n: js("document.getElementById('tableCancel').click();document.querySelector('#fileTabs [data-tab-id=b] [role=tab]').click();return 1", lambda v: GLib.timeout_add(700, lambda: (n(), False)[1]))),
+        ('cell-click', lambda n: click_selector('[data-note-row="1"][data-note-cell-column="1"]', n, .5, .5)),
+        ('cell-select', lambda n: key('ctrl+a', n)),
+        ('cell-type', lambda n: typed('8080', n)),
+        ('cell-ok', check('clicking a table cell edits it in place with real typing', "const el=document.activeElement;return [el.matches('.note-cell-input'),/\\| web +\\| 8080 \\|/.test(document.getElementById('editor').value)]", lambda v: v == [True, True])),
+        ('below-click', lambda n: click_selector('[data-note-text="1"]', n, .2, .5)),
+        ('below-type', lambda n: typed('Below', n)),
+        ('below-ok', check('text typed below the table is added after a blank line', "return [document.activeElement.dataset.noteText,document.getElementById('editor').value.endsWith('|\\n\\nBelow')]", lambda v: v == ['1', True])),
+        ('snap-inline', lambda n: snapshot('10-inline-table', n)),
     ]
 
     def run_steps():
@@ -240,6 +249,6 @@ tmp.cleanup()
 results['errors'] = [e for e in results['errors'] if e]
 failed = [step['check'] for step in results['steps'] if not step['ok']]
 for step in results['steps']: print(('ok    ' if step['ok'] else 'FAIL  ') + step['check'] + ('' if step['ok'] else ': ' + json.dumps(step['value'])))
-if failed or results['errors'] or results.get('timeout') or len(results['steps']) < 20:
+if failed or results['errors'] or results.get('timeout') or len(results['steps']) < 22:
     raise SystemExit('Native theme preview check failed: ' + json.dumps({'failed': failed, 'errors': results['errors'], 'timeout': results.get('timeout', False)}))
 print('Passed: native GTK/WebKit theme preferences with real input: in-app picker drag/hue/swatches/Escape, click-to-edit preview parts, live HEX, tabs and Apply.')

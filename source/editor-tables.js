@@ -60,6 +60,7 @@
     if(!tableSession)return;const data=tableSession.data,{row,column}=tableSession.active,format=$('tableFormat').value;
     $('tableRows').value=String(data.rows.length);$('tableColumns').value=String(data.rows[0].length);$('tableHeader').checked=data.header;
     $('tableSelection').textContent=`Row ${row+1} · column ${tableColumnName(column)}`;$('tableSummary').textContent=`${data.rows.length} row${data.rows.length===1?'':'s'} × ${data.rows[0].length} column${data.rows[0].length===1?'':'s'}`;
+    const hint=tableViewHint(note(),format,tableSession.from);$('tableViewHint').textContent=hint;$('tableViewHint').hidden=!hint;
     $('tableDeleteRow').disabled=data.rows.length<=1;$('tableDeleteColumn').disabled=data.rows[0].length<=1;$('tableAlignment').value=data.align[column]||'none';$('tableAlignment').disabled=!['markdown','html'].includes(format);
     syncSelectControls();syncTableSelection();
   }
@@ -119,6 +120,13 @@
     const prefix=before&&!before.endsWith(gap)?gap.slice(before.endsWith('\n')?1:0):'',suffix=after&&!after.startsWith(gap)?gap.slice(after.startsWith('\n')?1:0):'';
     return {text:prefix+value+suffix,start:from+prefix.length,end:from+prefix.length+value.length};
   }
+  // Says when a table will stay as text in the note instead of showing as an editable grid.
+  function tableViewHint(file,format,at){
+    if(!['text','markdown','html'].includes(file.mode))return `${MODES[file.mode]||'Code'} files show tables as text, so this table won't appear as a grid here. Tables appear as grids in Plain Text, Markdown and HTML files.`;
+    if(format==='csv'||format==='tsv')return `${format==='csv'?'CSV':'Tab-separated'} tables are inserted as plain text. Choose Markdown or HTML to see an editable grid in the note.`;
+    if(file.mode==='html'&&(format!=='html'||!/^\s*$/.test(file.content.slice(0,at))))return 'HTML files show the grid only when the file starts with an HTML table, so this table will appear as text.';
+    return '';
+  }
   function applyTable(asText=false){
     if(!tableSession)return false;const session=tableSession,file=note();
     if(!asText&&$('tableForm').reportValidity&&!$('tableForm').reportValidity())return false;
@@ -129,7 +137,10 @@
       if(!asText&&session.existing&&session.indent)value=value.replace(/\n/g,'\n'+session.indent).replace(/^/,session.initialFormat==='markdown'?session.indent:'');
       const insertion=session.existing||asText?{text:value,start:session.from,end:session.from+value.length}:tableInsertion(session.text,session.from,session.to,value,format);
       if(insertion.text!==session.text.slice(session.from,session.to))replaceText(session.from,session.to,insertion.text,insertion.start,insertion.end);
-      $('tableDialog').close();if(typeof refreshNoteTableView==='function')refreshNoteTableView({select:!asText,focus:true});toast(asText?'Pasted the original clipboard text.':session.existing?'Updated table. Undo restores the previous table.':'Inserted table. Use Tools → Insert/Edit Table to edit its cells.');return true;
+      // A new or edited table is shown as a grid even if this file was last left in Edit Source.
+      if(!asText&&typeof tableSourceFiles!=='undefined')tableSourceFiles.delete(file.id);
+      const grid=!asText&&!tableViewHint(file,format,session.from);
+      $('tableDialog').close();if(typeof refreshNoteTableView==='function')refreshNoteTableView({select:!asText,focus:true});toast(asText?'Pasted the original clipboard text.':!grid?(session.existing?'Updated table. It stays as text in this file.':'Inserted table as text. It stays as text in this file.'):session.existing?'Updated table. Undo restores the previous table.':'Inserted table. Click a cell to edit it.');return true;
     }catch(error){$('tableMessage').textContent=error.message;return false;}
   }
   async function copyTableCells(){

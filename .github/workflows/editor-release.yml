@@ -52,6 +52,7 @@ jobs:
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_note_tables_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_themes_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_theme_preview_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_note_table_inline_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_startup_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_lazy_startup_browser.cjs
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/another-note-browser-checks/node_modules/playwright" QA_SCREENSHOTS="$RUNNER_TEMP/another-note-ui" node checks/editor_closed_files_browser.cjs

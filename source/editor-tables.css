@@ -56,3 +56,4 @@
 .table-tabs button:focus-visible{outline:0;color:var(--text)}.table-tabs button:focus-visible:not([aria-selected=true]){border-bottom-color:var(--line)}
 .table-settings input[type=checkbox]{min-height:0;width:14px;height:14px;padding:0;background:var(--paper)}.table-settings input[type=checkbox]:checked{background:var(--accent)}
 .table-tabs button{border-radius:0}
+.table-view-hint{margin:0;padding:8px 20px;border-bottom:1px solid var(--line-soft);background:color-mix(in srgb,var(--accent) 10%,var(--panel));color:var(--text);font-size:12px;flex-shrink:0}

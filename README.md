@@ -309,3 +309,19 @@ All 43 JavaScript suites and 218 Python tests pass, along with the Chromium brow
 This build has the r13 features. The Fedora launcher now reads libadwaita's color schemes when it sets up the window style, rather than importing them each time the theme changes. This keeps the Fedora runtime checks working on systems without PyGObject, such as the release build machine. App behavior is unchanged from r13.
 
 All 218 Python tests pass both with and without PyGObject installed, along with the 43 JavaScript suites. The Fedora GTK/WebKit title bar and table checks passed again in a real window.
+
+## Build 2026.10.29-r15
+
+Tables in the note view can now be edited in place:
+- Click a cell and type; the file updates as you type. Double-click a header cell, or press Enter or F2 on a selected cell, to edit it too.
+- Tab and Shift+Tab move between cells. Tab after the last cell adds a row. Enter moves down; Shift+Enter adds a line break inside the cell.
+- Escape restores the cell's original text exactly. Each cell edit is one undo step.
+- Right-click a cell for **Insert Row Above/Below**, **Insert Column Left/Right**, **Delete Row** and **Delete Column**. **Edit Table…** still opens the full dialog.
+
+Text above, between and below tables can be typed directly in the table view, in Plain Text, Markdown and HTML files. Typing into the empty area below a table adds a blank line before the new text, which keeps it out of the table. Clearing the text removes that line again. A table typed into this text becomes a grid once focus leaves the note.
+
+Tables inserted or updated with the dialog now always show as a grid, even if the file was last left in **Edit Source**. The dialog says when a table will stay as text instead: in code files such as CSS or JavaScript, for CSV and tab-separated formats, and in HTML files that don't start with a table.
+
+Editing a cell or changing rows and columns rewrites that table in the dialog's aligned layout. The rest of the file is unchanged.
+
+All 43 JavaScript suites and 218 Python tests pass, with and without PyGObject, along with the Chromium browser checks. The new `node checks/editor_note_table_inline_browser.cjs` covers in-place editing, undo, Escape, new rows, surrounding text, right-click row and column commands, and the dialog notes; it also runs in the release workflow. `python3 checks/editor_theme_preview_gtk.py` passed in the Fedora GTK/WebKit window with real clicks and typing in a table cell and below the table. Windows visual testing was not performed.
