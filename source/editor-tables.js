@@ -110,7 +110,8 @@
     const separator=()=>({tabs:'\t',comma:',',semicolon:';'}[$('tableSeparator').value]||'auto');
     $('tableForm').addEventListener('submit',event=>{event.preventDefault();applyTable();});
     for(const id of ['tableCancel','tableClose'])$(id).addEventListener('click',()=>dialog.close());
-    dialog.addEventListener('close',()=>{clearTimeout(tablePreviewTimer);tableSession=null;for(const id of ['tableGrid','tablePreview'])$(id).innerHTML='';$('tableSource').textContent='';$('tablePasteInput').value='';editor.focus();});
+    // A queued close event may arrive after another table session has opened.
+    dialog.addEventListener('close',()=>{if(dialog.open)return;clearTimeout(tablePreviewTimer);tableSession=null;for(const id of ['tableGrid','tablePreview'])$(id).innerHTML='';$('tableSource').textContent='';$('tablePasteInput').value='';editor.focus();});
     $('tableTabs').addEventListener('click',event=>{const button=event.target.closest('[data-table-tab]');if(button)setTableTab(button.dataset.tableTab);});
     $('tableTabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const tabs=['cells','preview','source'],index=tabs.indexOf(tableSession.tab),next=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowRight'?1:2))%3;setTableTab(tabs[next]);$('tableTabs').querySelector(`[data-table-tab="${tabs[next]}"]`).focus();});
     $('tableGrid').addEventListener('focusin',event=>{const input=event.target;if(!input.matches('textarea[data-table-row]'))return;tableSession.active={row:Number(input.dataset.tableRow),column:Number(input.dataset.tableColumn)};syncTableControls();});
